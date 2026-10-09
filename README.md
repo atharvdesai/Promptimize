@@ -2,7 +2,7 @@
 
 The goal of this tool is to reduce costs in agentic coding by asking clarification questions to the user when the prompt is ambiguous.
 
-> **Status: dataset stage.** There is no trained model yet. This repo currently contains a hand-written seed dataset (420 examples), validation tooling, and the design decisions behind them. This README is the handoff doc: it explains what we are building, why, how the data is labeled, and what to do next.
+> **Status: dataset and context-builder prototype.** There is no trained model or chat/memory integration yet. This repo contains a hand-written seed dataset (420 examples), validation tooling, a deterministic context packer, and tests for its contract.
 
 ## Why this exists
 
@@ -37,6 +37,9 @@ dataset/
 scripts/
   validate_dataset.py                 # schema + labeling-rule checks and summary stats
   build_pdf.py                        # regenerates the PDF from the JSONL
+  context_builder.py                  # deterministic context packing with soft section budgets
+tests/
+  test_context_builder.py             # black-box contract tests for context packing
 requirements.txt                      # only needed for build_pdf.py (reportlab)
 ```
 
@@ -169,6 +172,12 @@ Suggested order of work:
    - **Under-asking rate**: how often it lets an ambiguous prompt through;
    - **Question quality**: does the question target the real missing information? This needs human or LLM-judge review; exact match is not meaningful.
 6. **Integrate** as a pre-flight hook for a coding agent and measure the real goal: tokens/cost per completed task with and without the gate.
+
+## Context builder prototype
+
+The context builder accepts the current prompt, recent conversation messages, and already-retrieved memory records. It preserves the prompt, applies configurable soft token targets to recent chat and long-term memories, and spills unused capacity in a configurable order. It does not retrieve memories or call a model.
+
+The default packing budget is **4,096 tokens**, a conservative working target for an 8,192-token ModernBERT-base input. This is not Jev's context limit. The default soft targets are 50% for recent chat and 30% for retrieved memories, leaving 20% shared; unused capacity spills to recent chat first, then memories. These settings are configurable. The caller supplies the tokenizer counter. Assistant-unconfirmed memories are excluded; retained memories carry source and confirmation metadata. Run the contract suite with `python3 -m unittest discover -s tests -v`.
 
 ## Contributing
 
