@@ -38,6 +38,8 @@ scripts/
   validate_dataset.py                 # schema + labeling-rule checks and summary stats
   build_pdf.py                        # regenerates the PDF from the JSONL
   context_builder.py                  # deterministic context packing with soft section budgets
+  make_splits.py                      # frozen, stratified train/val/test split generator
+  splits/                             # generated: train/val/test JSONL + manifest (test set is frozen)
 tests/
   test_context_builder.py             # black-box contract tests for context packing
 requirements.txt                      # only needed for build_pdf.py (reportlab)
@@ -130,6 +132,12 @@ python3 scripts/validate_dataset.py
 
 It checks the schema, the executable/ambiguous field rules, valid `ambiguity_type` values, that every question has a `?` and isn't generic, and that there are no duplicate prompts. It prints counts per type and exits non-zero on any problem.
 
+Create the train/val/test splits (stdlib only; deterministic for a fixed seed):
+
+```bash
+python3 scripts/make_splits.py
+```
+
 Regenerate the PDF (needs `reportlab`; a virtualenv is recommended because system Python on macOS is externally managed):
 
 ```bash
@@ -160,7 +168,7 @@ Be honest about these when evaluating anything built on this data:
 
 Suggested order of work:
 
-1. **Create splits.** 80/10/10, stratified by `ambiguity_type` and `can_execute`, with the test set frozen.
+1. ~~**Create splits.**~~ Done: `scripts/make_splits.py` produces an 80/10/10 split stratified by `can_execute` and `ambiguity_type` into `dataset/splits/` with a hashed manifest. The test set is frozen at seed 20261003 - do not re-split with a new seed unless a new frozen test set is intended.
 2. **Baseline first.** Run a strong prompted model (few-shot) on the test set before fine-tuning anything. It may match a small fine-tune at this data size and will expose label disagreements.
 3. **Grow the data** toward 1,500–3,000 examples, including:
    - real developer prompts (scrubbed of secrets and private code), labeled by hand;
