@@ -128,3 +128,90 @@ class MakeSplitsContractTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GroupedSplitTests(unittest.TestCase):
+    def grouped_rows(self):
+        rows = sample_rows()
+        # A minimal pair: same intent, once ambiguous, once with the detail added.
+        pair_amb = ambiguous_row(500, "missing_scope")
+        pair_amb["prompt"] = "make the search faster"
+        pair_exec = executable_row(500)
+        pair_exec["prompt"] = ("make the search faster: the /search endpoint p95 "
+                               "is 2s, target 300ms, see search/api.py")
+        return rows + [pair_amb, pair_exec]
+
+    def test_group_members_share_one_split(self):
+        rows = self.grouped_rows()
+        groups = {"make the search faster": 0,
+                  "make the search faster: the /search endpoint p95 is 2s, target 300ms, see search/api.py": 0}
+        for seed in (1, 2, 3, 7, 42):
+            splits = make_splits.make_splits(rows, seed=seed, groups=groups)
+            homes = [name for name in ("train", "val", "test")
+                     for row in splits[name] if row["prompt"] in groups]
+            self.assertEqual(len(homes), 2)
+            self.assertEqual(homes[0], homes[1],
+                             "group straddled splits at seed %d" % seed)
+
+    def test_ungrouped_rows_still_stratified(self):
+        rows = self.grouped_rows()
+        groups = {"make the search faster": 0,
+                  "make the search faster: the /search endpoint p95 is 2s, target 300ms, see search/api.py": 0}
+        splits = make_splits.make_splits(rows, seed=1, groups=groups)
+        ungrouped_held = [row for name in ("val", "test") for row in splits[name]
+                          if row["prompt"] not in groups]
+        for key in ("executable", "ambiguous:missing_scope", "ambiguous:missing_file"):
+            self.assertTrue(any(make_splits.stratum_key(row) == key
+                                for row in ungrouped_held))
+
+    def test_grouped_split_is_deterministic(self):
+        rows = self.grouped_rows()
+        groups = {"make the search faster": 0,
+                  "make the search faster: the /search endpoint p95 is 2s, target 300ms, see search/api.py": 0}
+        self.assertEqual(make_splits.make_splits(rows, seed=5, groups=groups),
+                         make_splits.make_splits(rows, seed=5, groups=groups))
+
+    def test_no_groups_matches_empty_groups(self):
+        rows = sample_rows()
+        self.assertEqual(make_splits.make_splits(rows, seed=1),
+                         make_splits.make_splits(rows, seed=1, groups={}))
+
+    def test_unknown_grouped_prompt_rejected(self):
+        with self.assertRaises(ValueError):
+            make_splits.make_splits(sample_rows(), seed=1,
+                                    groups={"no such prompt": 0, "also missing": 0})
+
+    def test_load_groups_validation(self):
+        import tempfile as _tf
+        with _tf.TemporaryDirectory() as tmp:
+            bad_overlap = Path(tmp) / "g.json"
+            bad_overlap.write_text(json.dumps({"groups": [["a", "b"], ["b", "c"]]}))
+            with self.assertRaises(ValueError):
+                make_splits.load_groups(bad_overlap)
+            bad_single = Path(tmp) / "h.json"
+            bad_single.write_text(json.dumps({"groups": [["a"]]}))
+            with self.assertRaises(ValueError):
+                make_splits.load_groups(bad_single)
+            good = Path(tmp) / "ok.json"
+            good.write_text(json.dumps({"groups": [["a", "b"]]}))
+            self.assertEqual(make_splits.load_groups(good), {"a": 0, "b": 0})
+
+
+class FrozenSplitGuardTests(unittest.TestCase):
+    """The committed test set is frozen: the real dataset at the default seed
+    must reproduce the committed hashes, or any change is a deliberate re-split."""
+
+    def test_real_dataset_reproduces_committed_splits(self):
+        root = MODULE_PATH.parent.parent
+        rows = [json.loads(line) for line in
+                (root / "dataset" / "clarifying_question_dataset.jsonl")
+                .read_text(encoding="utf-8").splitlines() if line.strip()]
+        manifest = json.loads((root / "dataset" / "splits" / "manifest.json")
+                              .read_text(encoding="utf-8"))
+        self.assertEqual(manifest["seed"], make_splits.DEFAULT_SEED)
+        splits = make_splits.make_splits(rows, manifest["seed"])
+        with tempfile.TemporaryDirectory() as tmp:
+            hashes = make_splits.write_splits(splits, tmp)
+        self.assertEqual(hashes, manifest["sha256"],
+                         "dataset or splitter changed: committed splits no longer "
+                         "reproduce; only change with a deliberate new frozen test set")
