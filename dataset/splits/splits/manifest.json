@@ -1,0 +1,33 @@
+{
+  "fractions": {
+    "test": 0.1,
+    "train": 0.8,
+    "val": 0.1
+  },
+  "frozen": "test.jsonl is a frozen evaluation set. Regenerate only with the same seed and dataset; a different seed is a new test set.",
+  "seed": 20261003,
+  "sha256": {
+    "test": "c1a99fb7c2750b076a3fdf9a153d009f7711532461499c467f62c3bd9a04905e",
+    "train": "8f5cae901426aaa7002f04514d6283866918f7d0f088f9fb4bb38987be8f5ea3",
+    "val": "1082613281cc007cc24502eef0a6e6b4cc60ff8a6525215aa0ea234960863563"
+  },
+  "split_rows": {
+    "test": 44,
+    "train": 332,
+    "val": 44
+  },
+  "strata_rows": {
+    "ambiguous:missing_acceptance_criteria": 15,
+    "ambiguous:missing_component": 15,
+    "ambiguous:missing_constraint": 14,
+    "ambiguous:missing_context": 54,
+    "ambiguous:missing_file": 14,
+    "ambiguous:missing_requirement": 26,
+    "ambiguous:missing_scope": 25,
+    "ambiguous:missing_technology": 16,
+    "ambiguous:multiple_interpretations": 16,
+    "ambiguous:unclear_goal": 15,
+    "executable": 210
+  },
+  "total_rows": 420
+}
