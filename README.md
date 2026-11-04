@@ -149,6 +149,11 @@ python3 -m venv .venv
 ## Adding examples
 
 1. Append lines to `dataset/clarifying_question_dataset.jsonl` (one JSON object per line, no trailing commas, UTF-8).
+   - **Minimal pairs / near-duplicates:** rows that are deliberately alike (roadmap step 3) must never land in different splits - that leaks the evaluation. Record each pair or cluster in `dataset/groups.json` so `make_splits.py` assigns it atomically to one split:
+     ```json
+     {"groups": [["make the search faster", "make the search faster: the /search endpoint p95 is 2s, target 300ms"]]}
+     ```
+     Adding or changing groups (or rows) changes split membership even at the frozen seed, so only do it when a new frozen test set is intended, then regenerate splits and commit everything together. With no groups file, the splitter always reproduces the committed frozen splits.
 2. Follow the [calibration rule](#the-calibration-rule-the-most-important-thing-in-this-repo) and keep ambiguity types balanced; the under-represented ones are the best place to add.
 3. Run `python3 scripts/validate_dataset.py` until it exits 0.
 4. Regenerate the PDF and commit both files together.
