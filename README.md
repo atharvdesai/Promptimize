@@ -39,9 +39,12 @@ scripts/
   build_pdf.py                        # regenerates the PDF from the JSONL
   context_builder.py                  # deterministic context packing with soft section budgets
   make_splits.py                      # frozen, stratified train/val/test split generator
+  evaluate.py                         # scores predictions against a frozen split
   splits/                             # generated: train/val/test JSONL + manifest (test set is frozen)
 tests/
   test_context_builder.py             # black-box contract tests for context packing
+  test_make_splits.py                 # contract tests for the splitter and frozen-set guard
+  test_evaluate.py                    # contract tests for the evaluator
 requirements.txt                      # only needed for build_pdf.py (reportlab)
 ```
 
@@ -138,6 +141,14 @@ Create the train/val/test splits (stdlib only; deterministic for a fixed seed):
 python3 scripts/make_splits.py
 ```
 
+Score a model's predictions against a frozen split (stdlib only):
+
+```bash
+python3 scripts/evaluate.py predictions.jsonl --gold dataset/splits/test.jsonl
+```
+
+Predictions are JSONL, one object per prompt: `"prompt"` and `"can_execute"` are required, `"clarifying_question"` and `"ambiguity_type"` are optional. The report gives accuracy against the majority-class baseline, the over-asking and under-asking rates, question coverage, a token-overlap F1 proxy for question quality, and detection rates per ambiguity type. Gold prompts with no prediction count as let-through, matching how a silent pre-flight gate behaves.
+
 Regenerate the PDF (needs `reportlab`; a virtualenv is recommended because system Python on macOS is externally managed):
 
 ```bash
@@ -166,7 +177,7 @@ Be honest about these when evaluating anything built on this data:
 - **Single-author, synthetic.** All prompts were written by one model-assisted author, so they share quirks. Notably, executable prompts tend to be longer and contain file paths while ambiguous ones are shorter, so a model could learn those surface features instead of reasoning about what's missing. Real developer prompts are needed to break this.
 - **Labels depend on context the model won't see.** Several rows are marked executable because an agent could discover the answer by running or reading something. At inference time the model sees only the prompt text. Either supply a short repo-context field in the future, or tighten those rows.
 - **`confidence` is not calibrated.** It is a hand-assigned estimate. Consider dropping it as a training target or collapsing it into coarse buckets (high/medium/low).
-- **No train/validation/test split yet.** Nothing has been evaluated.
+- **Small frozen test set.** The test split has 44 rows (seed 20261003), so any metric from `scripts/evaluate.py` carries wide uncertainty; treat numbers as directional, and never tune on the test split.
 - **Single-turn only.** Prompts like "apply the changes we discussed" are labeled ambiguous because no history is available; a real integration would have conversation context.
 
 ## Roadmap
@@ -180,10 +191,10 @@ Suggested order of work:
    - **minimal pairs**: the same prompt written once ambiguous and once with the missing detail added, so the model has to learn what's missing rather than surface features;
    - optional repo-context field for rows whose label depends on discoverable context.
 4. **Fine-tune** a small instruct model (LoRA on a 7–8B model, or a hosted fine-tuning API) with the output schema as the target.
-5. **Evaluate** on the frozen test set. The metrics that matter most:
+5. **Evaluate** on the frozen test set with `scripts/evaluate.py`. The metrics that matter most:
    - **Over-asking rate**: how often it interrupts an executable prompt (the costly error);
    - **Under-asking rate**: how often it lets an ambiguous prompt through;
-   - **Question quality**: does the question target the real missing information? This needs human or LLM-judge review; exact match is not meaningful.
+   - **Question quality**: does the question target the real missing information? This needs human or LLM-judge review; the evaluator's token-overlap F1 is only a rough proxy.
 6. **Integrate** as a pre-flight hook for a coding agent and measure the real goal: tokens/cost per completed task with and without the gate.
 
 ## Context builder prototype
