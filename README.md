@@ -40,6 +40,7 @@ scripts/
   context_builder.py                  # deterministic context packing with soft section budgets
   make_splits.py                      # frozen, stratified train/val/test split generator
   evaluate.py                         # scores predictions against a frozen split
+  make_baseline.py                    # trivial baseline predictions (never-ask / always-ask / oracle)
   splits/                             # generated: train/val/test JSONL + manifest (test set is frozen)
 tests/
   test_context_builder.py             # black-box contract tests for context packing
@@ -148,6 +149,17 @@ python3 scripts/evaluate.py predictions.jsonl --gold dataset/splits/test.jsonl
 ```
 
 Predictions are JSONL, one object per prompt: `"prompt"` and `"can_execute"` are required, `"clarifying_question"` and `"ambiguity_type"` are optional. The report gives accuracy against the majority-class baseline, the over-asking and under-asking rates, question coverage, a token-overlap F1 proxy for question quality, and detection rates per ambiguity type. Gold prompts with no prediction count as let-through, matching how a silent pre-flight gate behaves.
+
+No model yet? Generate trivial baseline predictions and score them to see the evaluator end to end:
+
+```bash
+python3 scripts/make_baseline.py oracle -o /tmp/oracle.jsonl      # copies gold labels; must score 1.0
+python3 scripts/evaluate.py /tmp/oracle.jsonl
+python3 scripts/make_baseline.py never-ask -o /tmp/never.jsonl    # every prompt executable
+python3 scripts/make_baseline.py always-ask -o /tmp/always.jsonl  # every prompt ambiguous
+```
+
+On the frozen test split (seed 20261003), `never-ask` scores 0.477 accuracy (pure under-asking) and `always-ask` 0.523 (pure over-asking, the costly error). A real model should beat both, and the `oracle` run doubles as a sanity check on the evaluator itself.
 
 Regenerate the PDF (needs `reportlab`; a virtualenv is recommended because system Python on macOS is externally managed):
 
