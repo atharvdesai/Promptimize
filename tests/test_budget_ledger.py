@@ -8,7 +8,13 @@ import unittest
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
-from budget_ledger import BudgetExhausted, BudgetLedger, CorruptLedger, cost_usd
+from budget_ledger import (
+    BudgetExhausted,
+    BudgetLedger,
+    CorruptLedger,
+    LedgerNotProvisioned,
+    cost_usd,
+)
 
 
 class BudgetLedgerTests(unittest.TestCase):
@@ -20,7 +26,7 @@ class BudgetLedgerTests(unittest.TestCase):
         self.dir.cleanup()
 
     def ledger(self, cap=2.00):
-        return BudgetLedger(path=self.path, cap_usd=cap)
+        return BudgetLedger(path=self.path, cap_usd=cap).provision("test")
 
     def test_reserve_settle_charges_actual_not_reserve(self):
         l = self.ledger()
@@ -60,7 +66,7 @@ class BudgetLedgerTests(unittest.TestCase):
         l = self.ledger()
         rid = l.reserve("test", 1000, 100)
         l.settle(rid, {"input_tokens": 1000, "output_tokens": 50})
-        l2 = self.ledger()
+        l2 = BudgetLedger(path=self.path, cap_usd=2.00)  # already provisioned
         self.assertAlmostEqual(l2._state["spent_usd"], l._state["spent_usd"], places=9)
 
     def test_ledger_never_contains_prompt_text(self):
@@ -97,7 +103,7 @@ class TestSafeguards(unittest.TestCase):
     def test_reserve_uses_cache_write_rate_as_input_worst_case(self):
         # Input worst case is the 5m cache-write rate, which exceeds plain
         # input: a cache-eligible call must never cost more than reserved.
-        ledger = BudgetLedger(self.path, cap_usd=2.0)
+        ledger = BudgetLedger(self.path, cap_usd=2.0).provision("t")
         rid = ledger.reserve("t", est_input_tokens=1000, max_output_tokens=200)
         reserved = ledger._state["reserved"][rid]["reserve_usd"]
         expected = (1000 * 0.125 + 200 * 0.50) / 1_000_000
@@ -110,7 +116,7 @@ class TestSafeguards(unittest.TestCase):
             BudgetLedger(self.path, cap_usd=2.0)
 
     def test_missing_main_file_restores_from_bak(self):
-        ledger = BudgetLedger(self.path, cap_usd=2.0)
+        ledger = BudgetLedger(self.path, cap_usd=2.0).provision("t")
         rid = ledger.reserve("t", 1000, 200)
         ledger.fail(rid, "boom")
         spent = ledger._state["spent_usd"]
@@ -120,7 +126,7 @@ class TestSafeguards(unittest.TestCase):
         self.assertAlmostEqual(restored._state["spent_usd"], spent, places=9)
 
     def test_settle_without_usage_charges_full_reservation(self):
-        ledger = BudgetLedger(self.path, cap_usd=2.0)
+        ledger = BudgetLedger(self.path, cap_usd=2.0).provision("t")
         rid = ledger.reserve("t", 1000, 200)
         reserved = ledger._state["reserved"][rid]["reserve_usd"]
         ledger.settle(rid, {})  # provider response with no usage object
@@ -128,6 +134,7 @@ class TestSafeguards(unittest.TestCase):
 
     def test_concurrent_reservations_cannot_overspend(self):
         # Two processes racing for the last headroom: exactly one wins.
+        BudgetLedger(self.path, cap_usd=0.0003).provision("t")  # before forking
         results = multiprocessing.Queue()
 
         def race():
@@ -146,3 +153,35 @@ class TestSafeguards(unittest.TestCase):
             p.join()
         outcomes = sorted(results.get() for _ in procs)
         self.assertEqual(outcomes, ["ok", "refused"])
+
+
+class TestProvisioning(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.path = os.path.join(self.dir, "budget.json")
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def test_unprovisioned_machine_refuses_paid_calls(self):
+        # Neither state file: the $2 approval is per experiment, not per
+        # machine, so a fresh install must NOT silently get a new cap.
+        ledger = BudgetLedger(self.path, cap_usd=2.0)
+        with self.assertRaises(LedgerNotProvisioned):
+            ledger.reserve("t", 100, 10)
+        with self.assertRaises(LedgerNotProvisioned):
+            ledger.remaining_usd()
+        self.assertFalse(os.path.exists(self.path))  # no implicit init
+
+    def test_explicit_provision_then_spend(self):
+        ledger = BudgetLedger(self.path, cap_usd=0.5).provision("second machine, $1.50 spent elsewhere")
+        rid = ledger.reserve("t", 100, 10)
+        ledger.settle(rid, {"input_tokens": 100, "output_tokens": 5})
+        self.assertGreater(ledger.committed_usd(), 0)
+        kinds = [e["kind"] for e in ledger._state["events"]]
+        self.assertEqual(kinds[0], "provision")
+
+    def test_reprovision_over_existing_state_refused(self):
+        BudgetLedger(self.path, cap_usd=2.0).provision("t")
+        with self.assertRaises(CorruptLedger):
+            BudgetLedger(self.path, cap_usd=2.0).provision("again")
