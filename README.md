@@ -150,6 +150,14 @@ python3 scripts/evaluate.py predictions.jsonl --gold dataset/splits/test.jsonl
 
 Predictions are JSONL, one object per prompt: `"prompt"` and `"can_execute"` are required, `"clarifying_question"` and `"ambiguity_type"` are optional. The report gives accuracy against the majority-class baseline, the over-asking and under-asking rates, question coverage, a token-overlap F1 proxy for question quality, and detection rates per ambiguity type. Gold prompts with no prediction count as let-through, matching how a silent pre-flight gate behaves.
 
+Add `--json` to print the metrics as JSON instead of the text report, so runs can be saved and diffed over time:
+
+```bash
+python3 scripts/evaluate.py predictions.jsonl --gold dataset/splits/val.jsonl --json > runs/model-a-val.json
+```
+
+While iterating, score against the validation split and keep these JSON runs; the test split stays reserved for the final comparison.
+
 No model yet? Generate trivial baseline predictions and score them to see the evaluator end to end:
 
 ```bash
