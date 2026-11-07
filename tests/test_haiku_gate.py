@@ -46,6 +46,14 @@ class HaikuGateTests(unittest.TestCase):
         settle = [e for e in self.ledger._state["events"] if e["kind"] == "settle"][0]
         self.assertEqual(settle["input_tokens"], 1100)
 
+    def test_reserve_adds_margin_over_provider_estimate(self):
+        # Provider calls its count an estimate; reserve must exceed it.
+        with mock.patch.object(haiku_gate, "_post_json", side_effect=self._fake_post):
+            call_gate("do the thing", self.ledger, "test", key_file=self.key_file)
+        reserve = [e for e in self.ledger._state["events"] if e["kind"] == "reserve"][0]
+        self.assertEqual(reserve["reserve_usd"],
+                         round((1238 * 0.125 + 200 * 0.50) / 1e6, 6))  # 1111*1.10+16
+
     def test_count_unavailable_refuses_before_any_paid_call(self):
         def boom(url, body, key, timeout):
             raise OSError("no network")
