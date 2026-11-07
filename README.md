@@ -38,8 +38,14 @@ scripts/
   validate_dataset.py                 # schema + labeling-rule checks and summary stats
   build_pdf.py                        # regenerates the PDF from the JSONL
   context_builder.py                  # deterministic context packing with soft section budgets
+  make_splits.py                      # frozen, stratified train/val/test split generator
+  evaluate.py                         # scores predictions against a frozen split
+  make_baseline.py                    # trivial baseline predictions (never-ask / always-ask / oracle)
+  splits/                             # generated: train/val/test JSONL + manifest (test set is frozen)
 tests/
   test_context_builder.py             # black-box contract tests for context packing
+  test_make_splits.py                 # contract tests for the splitter and frozen-set guard
+  test_evaluate.py                    # contract tests for the evaluator
 requirements.txt                      # only needed for build_pdf.py (reportlab)
 ```
 
@@ -130,6 +136,39 @@ python3 scripts/validate_dataset.py
 
 It checks the schema, the executable/ambiguous field rules, valid `ambiguity_type` values, that every question has a `?` and isn't generic, and that there are no duplicate prompts. It prints counts per type and exits non-zero on any problem.
 
+Create the train/val/test splits (stdlib only; deterministic for a fixed seed):
+
+```bash
+python3 scripts/make_splits.py
+```
+
+Score a model's predictions against a frozen split (stdlib only):
+
+```bash
+python3 scripts/evaluate.py predictions.jsonl --gold dataset/splits/test.jsonl
+```
+
+Predictions are JSONL, one object per prompt: `"prompt"` and `"can_execute"` are required, `"clarifying_question"` and `"ambiguity_type"` are optional. The report gives accuracy against the majority-class baseline, the over-asking and under-asking rates, question coverage, a token-overlap F1 proxy for question quality, and detection rates per ambiguity type. Gold prompts with no prediction count as let-through, matching how a silent pre-flight gate behaves.
+
+Add `--json` to print the metrics as JSON instead of the text report, so runs can be saved and diffed over time:
+
+```bash
+python3 scripts/evaluate.py predictions.jsonl --gold dataset/splits/val.jsonl --json > runs/model-a-val.json
+```
+
+While iterating, score against the validation split and keep these JSON runs; the test split stays reserved for the final comparison.
+
+No model yet? Generate trivial baseline predictions and score them to see the evaluator end to end:
+
+```bash
+python3 scripts/make_baseline.py oracle -o /tmp/oracle.jsonl      # copies gold labels; must score 1.0
+python3 scripts/evaluate.py /tmp/oracle.jsonl
+python3 scripts/make_baseline.py never-ask -o /tmp/never.jsonl    # every prompt executable
+python3 scripts/make_baseline.py always-ask -o /tmp/always.jsonl  # every prompt ambiguous
+```
+
+On the frozen test split (seed 20261003), `never-ask` scores 0.477 accuracy (pure under-asking) and `always-ask` 0.523 (pure over-asking, the costly error). A real model should beat both, and the `oracle` run doubles as a sanity check on the evaluator itself.
+
 Regenerate the PDF (needs `reportlab`; a virtualenv is recommended because system Python on macOS is externally managed):
 
 ```bash
@@ -141,6 +180,11 @@ python3 -m venv .venv
 ## Adding examples
 
 1. Append lines to `dataset/clarifying_question_dataset.jsonl` (one JSON object per line, no trailing commas, UTF-8).
+   - **Minimal pairs / near-duplicates:** rows that are deliberately alike (roadmap step 3) must never land in different splits - that leaks the evaluation. Record each pair or cluster in `dataset/groups.json` so `make_splits.py` assigns it atomically to one split:
+     ```json
+     {"groups": [["make the search faster", "make the search faster: the /search endpoint p95 is 2s, target 300ms"]]}
+     ```
+     Adding or changing groups (or rows) changes split membership even at the frozen seed, so only do it when a new frozen test set is intended, then regenerate splits and commit everything together. With no groups file, the splitter always reproduces the committed frozen splits.
 2. Follow the [calibration rule](#the-calibration-rule-the-most-important-thing-in-this-repo) and keep ambiguity types balanced; the under-represented ones are the best place to add.
 3. Run `python3 scripts/validate_dataset.py` until it exits 0.
 4. Regenerate the PDF and commit both files together.
@@ -153,24 +197,24 @@ Be honest about these when evaluating anything built on this data:
 - **Single-author, synthetic.** All prompts were written by one model-assisted author, so they share quirks. Notably, executable prompts tend to be longer and contain file paths while ambiguous ones are shorter, so a model could learn those surface features instead of reasoning about what's missing. Real developer prompts are needed to break this.
 - **Labels depend on context the model won't see.** Several rows are marked executable because an agent could discover the answer by running or reading something. At inference time the model sees only the prompt text. Either supply a short repo-context field in the future, or tighten those rows.
 - **`confidence` is not calibrated.** It is a hand-assigned estimate. Consider dropping it as a training target or collapsing it into coarse buckets (high/medium/low).
-- **No train/validation/test split yet.** Nothing has been evaluated.
+- **Small frozen test set.** The test split has 44 rows (seed 20261003), so any metric from `scripts/evaluate.py` carries wide uncertainty; treat numbers as directional, and never tune on the test split.
 - **Single-turn only.** Prompts like "apply the changes we discussed" are labeled ambiguous because no history is available; a real integration would have conversation context.
 
 ## Roadmap
 
 Suggested order of work:
 
-1. **Create splits.** 80/10/10, stratified by `ambiguity_type` and `can_execute`, with the test set frozen.
+1. ~~**Create splits.**~~ Done: `scripts/make_splits.py` produces an 80/10/10 split stratified by `can_execute` and `ambiguity_type` into `dataset/splits/` with a hashed manifest. The test set is frozen at seed 20261003 - do not re-split with a new seed unless a new frozen test set is intended.
 2. **Baseline first.** Run a strong prompted model (few-shot) on the test set before fine-tuning anything. It may match a small fine-tune at this data size and will expose label disagreements.
 3. **Grow the data** toward 1,500–3,000 examples, including:
    - real developer prompts (scrubbed of secrets and private code), labeled by hand;
    - **minimal pairs**: the same prompt written once ambiguous and once with the missing detail added, so the model has to learn what's missing rather than surface features;
    - optional repo-context field for rows whose label depends on discoverable context.
 4. **Fine-tune** a small instruct model (LoRA on a 7–8B model, or a hosted fine-tuning API) with the output schema as the target.
-5. **Evaluate** on the frozen test set. The metrics that matter most:
+5. **Evaluate** on the frozen test set with `scripts/evaluate.py`. The metrics that matter most:
    - **Over-asking rate**: how often it interrupts an executable prompt (the costly error);
    - **Under-asking rate**: how often it lets an ambiguous prompt through;
-   - **Question quality**: does the question target the real missing information? This needs human or LLM-judge review; exact match is not meaningful.
+   - **Question quality**: does the question target the real missing information? This needs human or LLM-judge review; the evaluator's token-overlap F1 is only a rough proxy.
 6. **Integrate** as a pre-flight hook for a coding agent and measure the real goal: tokens/cost per completed task with and without the gate.
 
 ## Context builder prototype
