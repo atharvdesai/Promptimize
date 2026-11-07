@@ -1,3 +1,8 @@
 .venv/
 __pycache__/
 .DS_Store
+
+# Local model weights and gate state - never commit
+model.onnx
+plugin/model.onnx
+.promptimize/
