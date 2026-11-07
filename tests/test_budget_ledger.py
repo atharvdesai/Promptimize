@@ -1,12 +1,14 @@
 import json
 import os
+import shutil
 import tempfile
+import multiprocessing
 import unittest
 
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
-from budget_ledger import BudgetExhausted, BudgetLedger, cost_usd
+from budget_ledger import BudgetExhausted, BudgetLedger, CorruptLedger, cost_usd
 
 
 class BudgetLedgerTests(unittest.TestCase):
@@ -23,8 +25,8 @@ class BudgetLedgerTests(unittest.TestCase):
     def test_reserve_settle_charges_actual_not_reserve(self):
         l = self.ledger()
         rid = l.reserve("test", est_input_tokens=2000, max_output_tokens=150)
-        # worst case reserve: 2000*0.10 + 150*0.50 per MTok
-        self.assertAlmostEqual(l.committed_usd(), 0.0002 + 0.000075, places=9)
+        # worst case reserve: input at cache-WRITE rate + max output
+        self.assertAlmostEqual(l.committed_usd(), 0.00025 + 0.000075, places=9)
         actual = l.settle(rid, {"input_tokens": 1800, "output_tokens": 40,
                                 "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0})
         self.assertAlmostEqual(actual, (1800 * 0.10 + 40 * 0.50) / 1e6, places=9)
@@ -49,7 +51,7 @@ class BudgetLedgerTests(unittest.TestCase):
     def test_failed_call_charges_full_reserve(self):
         l = self.ledger()
         rid = l.reserve("test", est_input_tokens=2000, max_output_tokens=150)
-        expected = 0.0002 + 0.000075
+        expected = 0.00025 + 0.000075
         charged = l.fail(rid, "http_500")
         self.assertAlmostEqual(charged, expected, places=9)
         self.assertAlmostEqual(l._state["spent_usd"], expected, places=9)
@@ -82,3 +84,65 @@ class BudgetLedgerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSafeguards(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.path = os.path.join(self.dir, "budget.json")
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def test_reserve_uses_cache_write_rate_as_input_worst_case(self):
+        # Input worst case is the 5m cache-write rate, which exceeds plain
+        # input: a cache-eligible call must never cost more than reserved.
+        ledger = BudgetLedger(self.path, cap_usd=2.0)
+        rid = ledger.reserve("t", est_input_tokens=1000, max_output_tokens=200)
+        reserved = ledger._state["reserved"][rid]["reserve_usd"]
+        expected = (1000 * 0.125 + 200 * 0.50) / 1_000_000
+        self.assertAlmostEqual(reserved, expected, places=9)
+
+    def test_corrupt_ledger_fails_closed(self):
+        with open(self.path, "w") as f:
+            f.write("{not json")
+        with self.assertRaises(CorruptLedger):
+            BudgetLedger(self.path, cap_usd=2.0)
+
+    def test_missing_main_file_restores_from_bak(self):
+        ledger = BudgetLedger(self.path, cap_usd=2.0)
+        rid = ledger.reserve("t", 1000, 200)
+        ledger.fail(rid, "boom")
+        spent = ledger._state["spent_usd"]
+        self.assertGreater(spent, 0)
+        os.remove(self.path)  # lose the main file, keep the mirror
+        restored = BudgetLedger(self.path, cap_usd=2.0)
+        self.assertAlmostEqual(restored._state["spent_usd"], spent, places=9)
+
+    def test_settle_without_usage_charges_full_reservation(self):
+        ledger = BudgetLedger(self.path, cap_usd=2.0)
+        rid = ledger.reserve("t", 1000, 200)
+        reserved = ledger._state["reserved"][rid]["reserve_usd"]
+        ledger.settle(rid, {})  # provider response with no usage object
+        self.assertAlmostEqual(ledger._state["spent_usd"], reserved, places=9)
+
+    def test_concurrent_reservations_cannot_overspend(self):
+        # Two processes racing for the last headroom: exactly one wins.
+        results = multiprocessing.Queue()
+
+        def race():
+            try:
+                BudgetLedger(self.path, cap_usd=0.0003).reserve("t", 1000, 200)
+                results.put("ok")
+            except BudgetExhausted:
+                results.put("refused")
+            except Exception as e:  # pragma: no cover - diagnostic
+                results.put("error:%s" % type(e).__name__)
+
+        procs = [multiprocessing.Process(target=race) for _ in range(2)]
+        for p in procs:
+            p.start()
+        for p in procs:
+            p.join()
+        outcomes = sorted(results.get() for _ in procs)
+        self.assertEqual(outcomes, ["ok", "refused"])
