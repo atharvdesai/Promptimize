@@ -2,7 +2,7 @@
 
 The goal of this tool is to reduce costs in agentic coding by asking clarification questions to the user when the prompt is ambiguous.
 
-> **Status: dataset and context-builder prototype.** There is no trained model or chat/memory integration yet. This repo contains a hand-written seed dataset (420 examples), validation tooling, a deterministic context packer, and tests for its contract.
+> **Status: dataset, evaluation tooling, and an experimental Claude Code hook.** This repo contains a hand-written seed dataset (420 examples), frozen group-aware splits, validation tooling, a deterministic context packer, a budget-capped few-shot baseline runner (`scripts/run_haiku_baseline.py`, roadmap step 2), and an experimental `UserPromptSubmit` hook (`plugin/`, sandbox-tested only - see its README). No trained model yet.
 
 ## Why this exists
 
@@ -168,6 +168,17 @@ python3 scripts/make_baseline.py always-ask -o /tmp/always.jsonl  # every prompt
 ```
 
 On the frozen test split (seed 20261003), `never-ask` scores 0.477 accuracy (pure under-asking) and `always-ask` 0.523 (pure over-asking, the costly error). A real model should beat both, and the `oracle` run doubles as a sanity check on the evaluator itself.
+
+## Measured gate candidates (validation split, 2026-11-07)
+
+Scored with `evaluate.py` on the **validation** split (n=44: 21 executable, 23 ambiguous). These are model-selection signals only - they say nothing yet about saved tokens or prevented rework on real tasks, and the frozen test split stays untouched until an approach is chosen.
+
+| candidate | accuracy | over-asking | under-asking | notes |
+| --- | --- | --- | --- | --- |
+| few-shot Haiku 5.5 (`run_haiku_baseline.py`) | 0.886 (39/44, 95% CI 0.76-0.95) | 0.000 (0/21) | 0.217 (5/23) | ~$0.0001/call with prompt caching, ~1 s/call; question coverage 1.0; `ambiguity_type` accuracy weak (0.39) |
+| zero-shot LAYA (base checkpoint, ONNX) | 0.682 (30/44, CI 0.53-0.80) | 0.524 (11/21) | 0.130 (3/23) | local, offline, ~0.33 s/decision, $0; threshold sweep: 0.35 trades over-asking 0.238 for under-asking 0.348 |
+
+The prompted model beats the local zero-shot checkpoint on both error kinds at negligible cost. The local path stays interesting for privacy/offline use and as the fine-tuning target (roadmap step 4); its zero-shot over-asking violates the calibration rule and would need threshold tuning plus task fine-tuning to compete. Reproduce: `scripts/run_haiku_baseline.py` (needs an Anthropic key file, costs cents) and the LAYA procedure recorded in the project changelog.
 
 Regenerate the PDF (needs `reportlab`; a virtualenv is recommended because system Python on macOS is externally managed):
 
