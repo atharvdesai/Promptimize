@@ -6,8 +6,11 @@ scores whether the request is executable as-is; when it scores below the
 threshold, Haiku drafts one clarifying question and the hook injects it
 as context so Claude asks you natively. It never blocks your prompt.
 
-**Status: experimental, dogfooding only. Tested in a Linux sandbox, not
-yet on macOS. Decision quality measured on the frozen validation split
+**Status: experimental command-hook prototype with manual settings.json
+wiring. This is not an installed or packaged Claude Code plugin, and the
+native Claude Code integration has not been tested yet (developed in a
+Linux sandbox without the Claude Code CLI; macOS dogfooding is the first
+real test). Decision quality measured on the frozen validation split
 (n=44) - real-world usefulness is unproven until used on real work.**
 
 ## Setup
@@ -32,9 +35,45 @@ Add to `~/.claude/settings.json`:
 }
 ```
 
-Set `PROMPTIMIZE_ANTHROPIC_KEY_FILE` to a file containing your Anthropic
-API key (billed to your API account, separate from a Claude
-subscription). The key file is read, never logged.
+**API key (never paste it into chat, settings.json, or the repo):**
+
+Preferred, macOS Keychain - run this once (it prompts nothing; replace
+the placeholder yourself, the key is never echoed back by the hook):
+
+```bash
+security add-generic-password -s promptimize-anthropic -a "$USER" -w 'sk-ant-...'
+export PROMPTIMIZE_ANTHROPIC_KEY_CMD='security find-generic-password -s promptimize-anthropic -w'
+```
+
+Or a permission-locked file (the hook REFUSES a group/world-readable
+key file):
+
+```bash
+install -m 600 /dev/null ~/.promptimize/anthropic_key   # then edit in an editor
+export PROMPTIMIZE_ANTHROPIC_KEY_FILE=~/.promptimize/anthropic_key
+```
+
+The key is billed to your Anthropic API account, separate from a Claude
+subscription. It is read at call time, never logged or echoed.
+
+**Budget provisioning (required once per machine):** the approved spend
+cap is a TOTAL across the experiment, not per install. The ledger
+refuses every paid call until explicitly provisioned:
+
+```bash
+# first machine:
+python3 scripts/budget_ledger.py init --cap 2.00 --note 'approved experiment cap'
+# any later machine: provision only what remains, e.g. if the first
+# machine's ledger/console shows $0.004 spent:
+python3 scripts/budget_ledger.py init --cap 1.996 --note 'machine 2: $2 minus $0.004 spent'
+python3 scripts/budget_ledger.py status   # inspect without spending
+```
+
+Before each paid call the hook asks the provider's free token-counting
+endpoint for the exact input tokens of the exact request and reserves
+that at the cache-write rate plus full max output; if counting is
+unavailable, the paid call is refused (the hook still fails open for
+your work).
 
 ## What it costs and stores
 
