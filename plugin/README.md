@@ -57,23 +57,33 @@ The key is billed to your Anthropic API account, separate from a Claude
 subscription. It is read at call time, never logged or echoed.
 
 **Budget provisioning (required once per machine):** the approved spend
-cap is a TOTAL across the experiment, not per install. The ledger
-refuses every paid call until explicitly provisioned:
+cap is a TOTAL across the whole experiment, not per install or per
+machine. The ledger refuses every paid call until explicitly
+provisioned with the REMAINING allowance - approved total minus
+everything already spent (and minus any outstanding reservations). This
+experiment has already spent $0.004489 of the approved $2.00 (as of
+2026-11-07), so the remaining allowance is $1.995511 - check first,
+spend may have moved:
 
 ```bash
-# first machine:
-python3 scripts/budget_ledger.py init --cap 2.00 --note 'approved experiment cap'
-# any later machine: provision only what remains, e.g. if the first
-# machine's ledger/console shows $0.004 spent:
-python3 scripts/budget_ledger.py init --cap 1.996 --note 'machine 2: $2 minus $0.004 spent'
-python3 scripts/budget_ledger.py status   # inspect without spending
+python3 scripts/budget_ledger.py status   # on the machine that already spent
+# on any new machine, provision ONLY the remaining allowance:
+python3 scripts/budget_ledger.py init --cap 1.995511 --note 'remaining of approved $2'
 ```
 
+Running on several machines at once: either keep the gate on ONE
+machine under the single shared cap, or explicitly PARTITION the
+remaining allowance between them (e.g. $1.00 on the laptop and
+$0.995511 on the desktop). Never provision the same remaining amount on
+two machines - that would double the approved total.
+
 Before each paid call the hook asks the provider's free token-counting
-endpoint for the exact input tokens of the exact request and reserves
-that at the cache-write rate plus full max output; if counting is
-unavailable, the paid call is refused (the hook still fails open for
-your work).
+endpoint for the input tokens of the exact request and reserves that
+count plus a safety margin (10% + 16 tokens - the provider calls its
+count an estimate that can differ by a small amount) at the cache-write
+rate plus full max output; if counting is unavailable, the paid call is
+refused (the hook still fails open for your work). This is conservative
+stop-before-cap accounting, not an exact billing guarantee.
 
 ## What it costs and stores
 
