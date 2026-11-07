@@ -18,8 +18,12 @@ Model ID from https://docs.claude.com/en/docs/about-claude/models/overview
 Token counting endpoint: free to use, separate rate limits, and billing
 reflects only request content (not system-added tokens), per
 https://docs.claude.com/en/docs/build-with-claude/token-counting (fetched
-2026-11-07) - so its count for the exact request body is the reserved
-input bound. If counting is unavailable, the paid call is refused.
+2026-11-07). That page also says the count "is an estimate" and actual
+billed input "might differ by a small amount", so the reserve adds a
+safety margin (10% + 16 tokens) and the ledger still stops strictly
+before the cap - this is conservative stop-before-cap accounting, not a
+mathematically exact billing guarantee. If counting is unavailable, the
+paid call is refused.
 Prompt-caching minimum for Haiku 5.5 is 512 tokens
 (https://docs.claude.com/en/docs/build-with-claude/prompt-caching), so
 this static few-shot prefix is cacheable; reserve math never assumes it.
@@ -172,9 +176,11 @@ def call_gate(user_prompt, ledger, purpose, key_file=None, max_tokens=DEFAULT_MA
     }
     key = _read_key(key_file)
 
-    # Exact input-token bound: the provider's count_tokens endpoint on the
-    # exact request content (free; billing reflects only content tokens).
-    # No bound, no paid call - fail closed.
+    # Conservative input bound: the provider's count_tokens endpoint on
+    # the exact request content (free; billing reflects content tokens).
+    # The provider calls the count an estimate that can differ by a small
+    # amount, so reserve adds a 10% + 16 token margin on top. No count,
+    # no paid call - fail closed.
     count_body = {
         "model": MODEL,
         "system": [{"type": "text", "text": system_text}],
@@ -182,11 +188,12 @@ def call_gate(user_prompt, ledger, purpose, key_file=None, max_tokens=DEFAULT_MA
     }
     try:
         count_resp = _post_json(COUNT_URL, count_body, key, timeout)
-        est_input = int(count_resp["input_tokens"])
+        counted = int(count_resp["input_tokens"])
     except Exception as e:
         raise GateCallError(
             "token counting unavailable (%s); refusing paid call" % type(e).__name__
         ) from e
+    est_input = int(counted * 1.10) + 16
 
     rid = ledger.reserve(purpose, est_input, max_tokens)
 
