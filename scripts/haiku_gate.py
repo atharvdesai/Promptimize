@@ -15,6 +15,11 @@ $0.125/MTok 5m cache write, $0.01/MTok cache read (prompts <= 100k),
 pinned 2026-11-07 from
 https://docs.claude.com/en/docs/about-claude/pricing
 Model ID from https://docs.claude.com/en/docs/about-claude/models/overview
+Token counting endpoint: free to use, separate rate limits, and billing
+reflects only request content (not system-added tokens), per
+https://docs.claude.com/en/docs/build-with-claude/token-counting (fetched
+2026-11-07) - so its count for the exact request body is the reserved
+input bound. If counting is unavailable, the paid call is refused.
 Prompt-caching minimum for Haiku 5.5 is 512 tokens
 (https://docs.claude.com/en/docs/build-with-claude/prompt-caching), so
 this static few-shot prefix is cacheable; reserve math never assumes it.
@@ -29,6 +34,7 @@ import urllib.request
 from budget_ledger import MODEL, BudgetLedger
 
 API_URL = "https://api.anthropic.com/v1/messages"
+COUNT_URL = "https://api.anthropic.com/v1/messages/count_tokens"
 ANTHROPIC_VERSION = "2026-10-21"
 DEFAULT_MAX_TOKENS = 200  # thinking is disabled; text-only output stays well under this
 
@@ -80,14 +86,41 @@ class GateParseError(RuntimeError):
 
 
 def _read_key(key_file=None):
+    """Read the API key without ever printing or logging it.
+
+    Preferred: PROMPTIMIZE_ANTHROPIC_KEY_CMD - a command whose stdout is
+    the key, e.g. macOS Keychain:
+      security find-generic-password -s promptimize-anthropic -w
+    Fallback: a key FILE (PROMPTIMIZE_ANTHROPIC_KEY_FILE) that must be
+    owner-only (mode 600/400); anything group/world-readable is refused.
+    """
+    cmd = os.environ.get("PROMPTIMIZE_ANTHROPIC_KEY_CMD")
+    if cmd:
+        import subprocess
+
+        out = subprocess.run(
+            cmd, shell=True, capture_output=True, text=True, timeout=10
+        )
+        if out.returncode != 0 or not out.stdout.strip():
+            raise GateCallError("PROMPTIMIZE_ANTHROPIC_KEY_CMD returned no key")
+        return out.stdout.strip()
     path = (
         key_file
         or os.environ.get("PROMPTIMIZE_ANTHROPIC_KEY_FILE")
         or os.environ.get("ANTHROPIC_KEY_FILE")
     )
     if not path:
-        raise GateCallError("no key file: set PROMPTIMIZE_ANTHROPIC_KEY_FILE")
-    with open(os.path.expanduser(path)) as f:
+        raise GateCallError(
+            "no key source: set PROMPTIMIZE_ANTHROPIC_KEY_CMD (keychain) "
+            "or PROMPTIMIZE_ANTHROPIC_KEY_FILE (mode-600 file)"
+        )
+    path = os.path.expanduser(path)
+    mode = os.stat(path).st_mode & 0o777
+    if mode & 0o077:
+        raise GateCallError(
+            "key file %s is group/world-readable (mode %o); chmod 600 it" % (path, mode)
+        )
+    with open(path) as f:
         return f.read().strip()
 
 
@@ -97,6 +130,21 @@ def _extract_json(text):
         text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
         text = re.sub(r"\n?```$", "", text.strip())
     return json.loads(text)
+
+
+def _post_json(url, body, key, timeout):
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode(),
+        headers={
+            "content-type": "application/json",
+            "x-api-key": key,
+            "anthropic-version": ANTHROPIC_VERSION,
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode())
 
 
 def call_gate(user_prompt, ledger, purpose, key_file=None, max_tokens=DEFAULT_MAX_TOKENS, timeout=25):
@@ -122,24 +170,28 @@ def call_gate(user_prompt, ledger, purpose, key_file=None, max_tokens=DEFAULT_MA
         ],
         "messages": [{"role": "user", "content": "Request: " + user_prompt}],
     }
-    payload = json.dumps(body).encode()
-    # Conservative uncached estimate: ~3.5 chars/token plus message framing.
-    est_input = int((len(system_text) + len(user_prompt)) / 3.5) + 64
+    key = _read_key(key_file)
+
+    # Exact input-token bound: the provider's count_tokens endpoint on the
+    # exact request content (free; billing reflects only content tokens).
+    # No bound, no paid call - fail closed.
+    count_body = {
+        "model": MODEL,
+        "system": [{"type": "text", "text": system_text}],
+        "messages": body["messages"],
+    }
+    try:
+        count_resp = _post_json(COUNT_URL, count_body, key, timeout)
+        est_input = int(count_resp["input_tokens"])
+    except Exception as e:
+        raise GateCallError(
+            "token counting unavailable (%s); refusing paid call" % type(e).__name__
+        ) from e
+
     rid = ledger.reserve(purpose, est_input, max_tokens)
 
-    req = urllib.request.Request(
-        API_URL,
-        data=payload,
-        headers={
-            "content-type": "application/json",
-            "x-api-key": _read_key(key_file),
-            "anthropic-version": ANTHROPIC_VERSION,
-        },
-        method="POST",
-    )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = json.loads(resp.read().decode())
+        data = _post_json(API_URL, body, key, timeout)
     except urllib.error.HTTPError as e:
         ledger.fail(rid, "http_%s" % e.code)
         raise GateCallError("HTTP %s from Messages API" % e.code) from e
