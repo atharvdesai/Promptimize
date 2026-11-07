@@ -2,6 +2,7 @@
 """Score clarifying-question predictions against a frozen split.
 
 Usage: python3 scripts/evaluate.py predictions.jsonl [--gold dataset/splits/test.jsonl]
+                           [--json]
 
 Predictions are JSONL, one object per prompt:
 
@@ -18,6 +19,11 @@ executable prompt, the costly error), under-asking rate (letting an
 ambiguous prompt through), and a token-overlap F1 between predicted and
 gold questions as a rough quality proxy. Question quality still needs
 human or LLM-judge review; exact match is not meaningful.
+
+Pass --json to print the full metrics dict as JSON instead of the
+text report, so runs can be saved, diffed, and tracked over time
+(iterate on the validation split; the test split stays reserved
+for the final comparison).
 
 A gold prompt with no prediction counts as "predicted executable" - the
 realistic behavior of a pre-flight gate that stays silent is to let the
@@ -202,6 +208,8 @@ def main(argv=None):
     ap.add_argument("predictions", help="JSONL of model predictions")
     ap.add_argument("--gold", default=DEFAULT_GOLD,
                     help="gold JSONL split (default: %(default)s)")
+    ap.add_argument("--json", action="store_true",
+                    help="print the metrics dict as JSON instead of the text report")
     args = ap.parse_args(argv)
     try:
         gold = load_jsonl(args.gold)
@@ -213,7 +221,11 @@ def main(argv=None):
     if not gold:
         print("error: no gold rows in %s" % args.gold, file=sys.stderr)
         return 1
-    print_report(result, args.gold, sys.stdout)
+    if args.json:
+        json.dump(result, sys.stdout, indent=2, sort_keys=True)
+        sys.stdout.write("\n")
+    else:
+        print_report(result, args.gold, sys.stdout)
     return 0
 
 
