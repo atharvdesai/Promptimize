@@ -178,6 +178,36 @@ class CliTests(unittest.TestCase):
         self.assertIn("1 missing predictions", out.getvalue())
         self.assertIn("warning: 1 predictions match no gold row", out.getvalue())
 
+    def test_json_flag_emits_parseable_metrics(self):
+        gold_path = self._write_jsonl(sample_gold())
+        pred_path = self._write_jsonl(perfect_predictions())
+        out = io.StringIO()
+        import contextlib
+        with contextlib.redirect_stdout(out):
+            code = evaluate.main([pred_path, "--gold", gold_path, "--json"])
+        self.assertEqual(code, 0)
+        data = json.loads(out.getvalue())
+        self.assertEqual(data["accuracy"], 1.0)
+        self.assertEqual(data["over_asking_rate"], 0.0)
+        self.assertEqual(data["under_asking_rate"], 0.0)
+        self.assertEqual(data["confusion"], {"tp": 2, "fp": 0, "fn": 0, "tn": 2})
+        self.assertIn("per_type", data)
+        self.assertIn("missing_predictions", data)
+
+    def test_json_flag_reflects_errors_like_text_report(self):
+        gold_path = self._write_jsonl(sample_gold())
+        pred_path = self._write_jsonl(perfect_predictions()[:3]
+                                      + [pred("stray", True)])
+        out = io.StringIO()
+        import contextlib
+        with contextlib.redirect_stdout(out):
+            code = evaluate.main([pred_path, "--gold", gold_path, "--json"])
+        self.assertEqual(code, 0)
+        data = json.loads(out.getvalue())
+        self.assertEqual(data["missing_predictions"], ["add auth"])
+        self.assertEqual(data["extra_predictions"], ["stray"])
+        self.assertEqual(data["under_asking_rate"], 0.5)
+
     def test_main_rejects_malformed_json(self):
         gold_path = self._write_jsonl(sample_gold())
         fh = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False)
