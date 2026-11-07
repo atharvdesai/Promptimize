@@ -11,11 +11,26 @@ user's own work.
 
 The ledger records usage totals only. Prompt text is never written here.
 
+Safeguards:
+- Atomic across processes: every mutation holds an exclusive flock on a
+  sibling lock file and re-reads state inside the lock, so concurrent
+  hook processes cannot both spend the same headroom.
+- Corrupt ledger: loading a damaged file raises CorruptLedger (fail
+  closed - no calls) instead of silently resetting spend to zero.
+- Missing ledger: if the main file is gone but the .bak mirror exists,
+  it is restored (a fresh machine with neither starts at zero, which is
+  correct - the Anthropic console remains the billing ground truth).
+- Reserve math uses the cache-WRITE rate for input tokens (higher than
+  plain input), so caching can only ever cost less than reserved.
+- settle() with missing usage data charges the full reservation; a
+  response without usage counts as unknown billable usage.
+
 Rates pinned from https://docs.claude.com/en/docs/about-claude/pricing
 (fetched 2026-11-07), Claude Haiku 5.5, prompts <= 100,000 tokens.
 Re-pin from that page before relying on them later.
 """
 
+import fcntl
 import json
 import os
 import time
@@ -33,6 +48,10 @@ DEFAULT_CAP_USD = 2.00
 
 class BudgetExhausted(RuntimeError):
     """Raised when a reservation would exceed the cap. Callers fail open."""
+
+
+class CorruptLedger(RuntimeError):
+    """The ledger file exists but is unreadable. Fail closed, keep the file."""
 
 
 def cost_usd(input_tokens=0, output_tokens=0, cache_write_tokens=0, cache_read_tokens=0):
@@ -59,16 +78,31 @@ class BudgetLedger:
         )
         self._state = self._load()
 
-    def _load(self):
+    def _read_state(self):
+        """Read state from disk. Corrupt data fails closed, never resets."""
         try:
             with open(self.path) as f:
                 state = json.load(f)
-            state.setdefault("spent_usd", 0.0)
-            state.setdefault("reserved", {})
-            state.setdefault("events", [])
-            return state
-        except (OSError, json.JSONDecodeError):
-            return {"spent_usd": 0.0, "reserved": {}, "events": []}
+        except FileNotFoundError:
+            bak = self.path + ".bak"
+            if os.path.exists(bak):
+                # Main file lost (reinstall, cleanup): restore the mirror
+                # rather than resetting the approved remaining budget.
+                with open(bak) as f:
+                    state = json.load(f)
+            else:
+                state = {"spent_usd": 0.0, "reserved": {}, "events": []}
+        except json.JSONDecodeError as e:
+            raise CorruptLedger(
+                "budget ledger %s is corrupt; refusing paid calls until fixed" % self.path
+            ) from e
+        state.setdefault("spent_usd", 0.0)
+        state.setdefault("reserved", {})
+        state.setdefault("events", [])
+        return state
+
+    def _load(self):
+        return self._read_state()
 
     def _save(self):
         directory = os.path.dirname(self.path)
@@ -78,6 +112,25 @@ class BudgetLedger:
         with open(tmp, "w") as f:
             json.dump(self._state, f, indent=1, sort_keys=True)
         os.replace(tmp, self.path)
+        try:
+            with open(self.path + ".bak", "w") as f:
+                json.dump(self._state, f, indent=1, sort_keys=True)
+        except OSError:
+            pass
+
+    def _locked(self, fn):
+        """Run fn(self) holding an exclusive cross-process lock, state fresh."""
+        lock_path = self.path + ".lock"
+        os.makedirs(os.path.dirname(lock_path) or ".", exist_ok=True)
+        with open(lock_path, "a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            try:
+                self._state = self._read_state()
+                result = fn(self)
+                self._save()
+            finally:
+                fcntl.flock(lock, fcntl.LOCK_UN)
+        return result
 
     def _event(self, kind, purpose, **fields):
         entry = {"ts": time.time(), "kind": kind, "purpose": purpose, "model": MODEL}
@@ -92,69 +145,91 @@ class BudgetLedger:
         return self.cap_usd - self.committed_usd()
 
     def reserve(self, purpose, est_input_tokens, max_output_tokens):
-        """Reserve worst-case (uncached) cost. Returns a reservation id."""
-        reserve = cost_usd(est_input_tokens, max_output_tokens)
-        if reserve > self.remaining_usd() + 1e-12:
-            self._event(
-                "refused",
-                purpose,
-                needed_usd=round(reserve, 6),
-                remaining_usd=round(self.remaining_usd(), 6),
-            )
-            self._save()
-            raise BudgetExhausted(
-                "reserving $%.6f would exceed the $%.2f cap (%.6f remaining)"
-                % (reserve, self.cap_usd, self.remaining_usd())
-            )
-        rid = uuid.uuid4().hex[:16]
-        self._state["reserved"][rid] = {
-            "reserve_usd": reserve,
-            "purpose": purpose,
-            "est_input_tokens": est_input_tokens,
-            "max_output_tokens": max_output_tokens,
-            "ts": time.time(),
-        }
-        self._event("reserve", purpose, rid=rid, reserve_usd=round(reserve, 6))
-        self._save()
-        return rid
+        """Reserve worst-case cost. Returns a reservation id.
+
+        Worst case = input tokens at the 5m cache-WRITE rate (higher than
+        plain input) plus max output tokens, so a cache-eligible call can
+        only cost less than reserved. Atomic across processes.
+        """
+        def _do(ledger):
+            reserve = cost_usd(output_tokens=max_output_tokens,
+                               cache_write_tokens=est_input_tokens)
+            if reserve > ledger.remaining_usd() + 1e-12:
+                ledger._event(
+                    "refused",
+                    purpose,
+                    needed_usd=round(reserve, 6),
+                    remaining_usd=round(ledger.remaining_usd(), 6),
+                )
+                ledger._save()  # keep the refusal on the audit trail
+                raise BudgetExhausted(
+                    "reserving $%.6f would exceed the $%.2f cap (%.6f remaining)"
+                    % (reserve, ledger.cap_usd, ledger.remaining_usd())
+                )
+            rid = uuid.uuid4().hex[:16]
+            ledger._state["reserved"][rid] = {
+                "reserve_usd": reserve,
+                "purpose": purpose,
+                "est_input_tokens": est_input_tokens,
+                "max_output_tokens": max_output_tokens,
+                "ts": time.time(),
+            }
+            ledger._event("reserve", purpose, rid=rid, reserve_usd=round(reserve, 6))
+            return rid
+        return self._locked(_do)
 
     def settle(self, rid, usage):
-        """Replace a reservation with actual billed usage. Returns actual cost."""
-        self._state["reserved"].pop(rid, None)
-        actual = cost_usd(
-            input_tokens=usage.get("input_tokens", 0),
-            output_tokens=usage.get("output_tokens", 0),
-            cache_write_tokens=usage.get("cache_creation_input_tokens", 0),
-            cache_read_tokens=usage.get("cache_read_input_tokens", 0),
-        )
-        self._state["spent_usd"] += actual
-        self._event(
-            "settle",
-            self._purpose_of(rid),
-            actual_usd=round(actual, 6),
-            input_tokens=usage.get("input_tokens", 0),
-            output_tokens=usage.get("output_tokens", 0),
-            cache_write_tokens=usage.get("cache_creation_input_tokens", 0),
-            cache_read_tokens=usage.get("cache_read_input_tokens", 0),
-            spent_total_usd=round(self._state["spent_usd"], 6),
-        )
-        self._save()
-        return actual
+        """Replace a reservation with actual billed usage. Returns actual cost.
+
+        usage comes from the provider response. If it is missing or has no
+        token fields, the bill is unknowable - charge the full reservation
+        (conservative) instead of recording zero.
+        """
+        if not usage or not any(
+            k in usage
+            for k in ("input_tokens", "output_tokens",
+                      "cache_creation_input_tokens", "cache_read_input_tokens")
+        ):
+            self.fail(rid, "missing_usage")
+            return self._state["events"][-1].get("charged_usd", 0.0)
+
+        def _do(ledger):
+            ledger._state["reserved"].pop(rid, None)
+            actual = cost_usd(
+                input_tokens=usage.get("input_tokens", 0),
+                output_tokens=usage.get("output_tokens", 0),
+                cache_write_tokens=usage.get("cache_creation_input_tokens", 0),
+                cache_read_tokens=usage.get("cache_read_input_tokens", 0),
+            )
+            ledger._state["spent_usd"] += actual
+            ledger._event(
+                "settle",
+                ledger._purpose_of(rid),
+                actual_usd=round(actual, 6),
+                input_tokens=usage.get("input_tokens", 0),
+                output_tokens=usage.get("output_tokens", 0),
+                cache_write_tokens=usage.get("cache_creation_input_tokens", 0),
+                cache_read_tokens=usage.get("cache_read_input_tokens", 0),
+                spent_total_usd=round(ledger._state["spent_usd"], 6),
+            )
+            return actual
+        return self._locked(_do)
 
     def fail(self, rid, error_kind):
         """Charge the full reservation on a failed call (conservative)."""
-        r = self._state["reserved"].pop(rid, None)
-        charged = r["reserve_usd"] if r else 0.0
-        self._state["spent_usd"] += charged
-        self._event(
-            "fail",
-            r["purpose"] if r else "unknown",
-            charged_usd=round(charged, 6),
-            error=error_kind,
-            spent_total_usd=round(self._state["spent_usd"], 6),
-        )
-        self._save()
-        return charged
+        def _do(ledger):
+            r = ledger._state["reserved"].pop(rid, None)
+            charged = r["reserve_usd"] if r else 0.0
+            ledger._state["spent_usd"] += charged
+            ledger._event(
+                "fail",
+                r["purpose"] if r else "unknown",
+                charged_usd=round(charged, 6),
+                error=error_kind,
+                spent_total_usd=round(ledger._state["spent_usd"], 6),
+            )
+            return charged
+        return self._locked(_do)
 
     def _purpose_of(self, rid):
         # purpose was already popped in settle; look back at events for accuracy
