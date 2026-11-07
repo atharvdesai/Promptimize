@@ -17,9 +17,12 @@ Safeguards:
   hook processes cannot both spend the same headroom.
 - Corrupt ledger: loading a damaged file raises CorruptLedger (fail
   closed - no calls) instead of silently resetting spend to zero.
-- Missing ledger: if the main file is gone but the .bak mirror exists,
-  it is restored (a fresh machine with neither starts at zero, which is
-  correct - the Anthropic console remains the billing ground truth).
+- Explicit provisioning: with neither state file present the ledger
+  refuses every paid call (LedgerNotProvisioned). The approved total is
+  per experiment, not per machine: provision a fresh machine with the
+  REMAINING allowance only (approved total minus spend already accounted
+  in the previous ledger / Anthropic console), via
+  `python3 scripts/budget_ledger.py init --cap <remaining_usd>`.
 - Reserve math uses the cache-WRITE rate for input tokens (higher than
   plain input), so caching can only ever cost less than reserved.
 - settle() with missing usage data charges the full reservation; a
@@ -52,6 +55,14 @@ class BudgetExhausted(RuntimeError):
 
 class CorruptLedger(RuntimeError):
     """The ledger file exists but is unreadable. Fail closed, keep the file."""
+
+
+class LedgerNotProvisioned(RuntimeError):
+    """No ledger state on this machine and no explicit provisioning yet.
+
+    The cap is a total across the whole experiment, not per install, so a
+    fresh machine must be provisioned with the remaining allowance (see
+    module docstring) before any paid call is allowed."""
 
 
 def cost_usd(input_tokens=0, output_tokens=0, cache_write_tokens=0, cache_read_tokens=0):
@@ -91,7 +102,7 @@ class BudgetLedger:
                 with open(bak) as f:
                     state = json.load(f)
             else:
-                state = {"spent_usd": 0.0, "reserved": {}, "events": []}
+                return None  # unprovisioned - callers fail closed
         except json.JSONDecodeError as e:
             raise CorruptLedger(
                 "budget ledger %s is corrupt; refusing paid calls until fixed" % self.path
@@ -102,6 +113,7 @@ class BudgetLedger:
         return state
 
     def _load(self):
+        # None when unprovisioned; read methods and mutations fail closed.
         return self._read_state()
 
     def _save(self):
@@ -126,11 +138,23 @@ class BudgetLedger:
             fcntl.flock(lock, fcntl.LOCK_EX)
             try:
                 self._state = self._read_state()
+                if self._state is None:
+                    raise LedgerNotProvisioned(
+                        "no budget ledger at %s: provision the remaining "
+                        "allowance first (scripts/budget_ledger.py init)" % self.path
+                    )
                 result = fn(self)
                 self._save()
             finally:
                 fcntl.flock(lock, fcntl.LOCK_UN)
         return result
+
+    def _require_state(self):
+        if self._state is None:
+            raise LedgerNotProvisioned(
+                "no budget ledger at %s: provision first" % self.path
+            )
+        return self._state
 
     def _event(self, kind, purpose, **fields):
         entry = {"ts": time.time(), "kind": kind, "purpose": purpose, "model": MODEL}
@@ -138,11 +162,35 @@ class BudgetLedger:
         self._state["events"].append(entry)
 
     def committed_usd(self):
-        reserved = sum(r["reserve_usd"] for r in self._state["reserved"].values())
-        return self._state["spent_usd"] + reserved
+        state = self._require_state()
+        reserved = sum(r["reserve_usd"] for r in state["reserved"].values())
+        return state["spent_usd"] + reserved
 
     def remaining_usd(self):
         return self.cap_usd - self.committed_usd()
+
+    def provision(self, note=""):
+        """Explicitly initialize this machine's allowance. Fails if state
+        already exists (use the existing ledger; never double-provision)."""
+        if os.path.exists(self.path) or os.path.exists(self.path + ".bak"):
+            raise CorruptLedger(
+                "ledger already exists at %s; refusing to re-provision" % self.path
+            )
+        self._state = {
+            "spent_usd": 0.0,
+            "reserved": {},
+            "events": [
+                {
+                    "ts": time.time(),
+                    "kind": "provision",
+                    "purpose": note or "manual init",
+                    "model": MODEL,
+                    "cap_usd": self.cap_usd,
+                }
+            ],
+        }
+        self._save()
+        return self
 
     def reserve(self, purpose, est_input_tokens, max_output_tokens):
         """Reserve worst-case cost. Returns a reservation id.
@@ -237,3 +285,50 @@ class BudgetLedger:
             if entry["kind"] == "reserve" and entry.get("rid") == rid:
                 return entry["purpose"]
         return "unknown"
+
+
+def _main(argv):
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Provision the Promptimize budget ledger on this machine."
+    )
+    parser.add_argument("command", choices=["init", "status"])
+    parser.add_argument(
+        "--cap",
+        type=float,
+        default=None,
+        help="Remaining allowance in USD for THIS machine. The approved "
+        "total is per experiment: on a second machine, provision only "
+        "approved_total minus spend already accounted elsewhere.",
+    )
+    parser.add_argument("--path", default=None)
+    parser.add_argument("--note", default="")
+    args = parser.parse_args(argv)
+
+    ledger = BudgetLedger(path=args.path, cap_usd=args.cap)
+    if args.command == "init":
+        if args.cap is None:
+            parser.error("init requires --cap (remaining allowance in USD)")
+        ledger.provision(note=args.note)
+        print("provisioned %s with remaining allowance $%.2f" % (ledger.path, ledger.cap_usd))
+    else:
+        state = ledger._read_state()
+        if state is None:
+            print("unprovisioned: %s (no paid calls allowed)" % ledger.path)
+        else:
+            print(
+                "spent $%.6f, reserved $%.6f, remaining $%.6f of $%.2f"
+                % (
+                    state["spent_usd"],
+                    sum(r["reserve_usd"] for r in state["reserved"].values()),
+                    ledger.cap_usd - ledger.committed_usd(),
+                    ledger.cap_usd,
+                )
+            )
+
+
+if __name__ == "__main__":
+    import sys
+
+    _main(sys.argv[1:])
