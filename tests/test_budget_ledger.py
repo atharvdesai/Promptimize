@@ -185,3 +185,25 @@ class TestProvisioning(unittest.TestCase):
         BudgetLedger(self.path, cap_usd=2.0).provision("t")
         with self.assertRaises(CorruptLedger):
             BudgetLedger(self.path, cap_usd=2.0).provision("again")
+
+class TestCapUpdate(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.path = os.path.join(self.dir, "budget.json")
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def test_set_cap_records_provenance_and_applies(self):
+        ledger = BudgetLedger(self.path, cap_usd=2.0).provision("t")
+        rid = ledger.reserve("t", 1000, 100)
+        ledger.fail(rid, "x")
+        ledger.set_cap(10.0, note="user raised total cap")
+        self.assertAlmostEqual(ledger.remaining_usd(),
+                               10.0 - ledger._state["spent_usd"], places=9)
+        events = [e for e in ledger._state["events"] if e["kind"] == "cap_update"]
+        self.assertEqual(events[0]["old_cap_usd"], 2.0)
+        self.assertEqual(events[0]["new_cap_usd"], 10.0)
+        # survives reload
+        again = BudgetLedger(self.path, cap_usd=2.0)
+        self.assertAlmostEqual(again.remaining_usd(), ledger.remaining_usd(), places=9)
