@@ -33,10 +33,11 @@ measured val acc 0.682, over-asking 0.238 / under-asking 0.348 at 0.35
 (n=44, frozen split). "head" is the trained numpy logistic head from
 trial T5 on the same frozen LAYA embeddings with input normalization
 (gate_normalize.normalize, applied identically at train and inference
-time): measured val acc 0.977, over 0.023 / under 0.000 at p_ambiguous
+time): measured val acc 0.977, over 0.048 / under 0.000 at p_ambiguous
 0.05 (artifact as shipped, n=44, frozen split). Both figures are one validation split reused across trials -
 directional, not validated on real usage. The head's measured blind
-spot is LONG prompts (>= 200 chars): ambiguous-recall 0/8 on probe
+spot is LONG prompts (the probe failure zone, flagged >= 200 chars as
+a heuristic, not a validated boundary): ambiguous-recall 0/8 on probe
 families 1+2 (trials P2/P3 - replicates on a cross-encoder, so it is
 likely dataset surface correlation, not the encoder). Decisions in the
 blind-spot zone are logged with blind_spot=true so dogfooding data can
