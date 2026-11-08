@@ -19,8 +19,10 @@ Config (env):
   PROMPTIMIZE_DECIDER         "head", "noul", or "auto" (default auto:
                               head when plugin/gate_head.json exists, else noul)
   PROMPTIMIZE_GATE_HEAD       path to the head artifact (default: plugin/gate_head.json)
-  PROMPTIMIZE_THRESHOLD       ask when P(can_execute) < this (defaults: 0.95
-                              for the head decider, 0.35 for noul)
+  PROMPTIMIZE_THRESHOLD       ask-threshold on P(can_execute) (defaults:
+                              0.95 for the head decider, compared <= so it
+                              matches the evaluator's p_ambiguous >= 0.05
+                              exactly; 0.35 for noul, compared <)
   PROMPTIMIZE_MODE            "hybrid" (local decider scores, Haiku writes the
                               question; default) or "haiku" (Haiku does
                               both - the comparison arm; no local model)
@@ -257,7 +259,11 @@ def run(stdin_text):
         _log("decision", mode=mode, decider=decider, prob=round(prob, 4),
              threshold=threshold, latency_ms=decision_ms,
              blind_spot=in_measured_blind_spot(prompt))
-        if prob >= threshold:
+        # Head: ask when P(can_execute) <= 0.95, EXACTLY equivalent to the
+        # evaluator's convention p_ambiguous >= 0.05 (metrics(): ask iff
+        # >= thr). Noul keeps the original strict-< posture.
+        asks = prob <= threshold if decider == "head" else prob < threshold
+        if not asks:
             return None
         try:
             question, usage = write_question(prompt, ledger)
