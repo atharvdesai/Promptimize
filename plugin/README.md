@@ -130,8 +130,13 @@ present (it ships with the repo), else the noul decider.
 - `noul`: LAYA's zero-shot head. Measured val acc 0.682.
 
 `PROMPTIMIZE_THRESHOLD` (defaults: `0.95` for the head decider, `0.35`
-for noul): lower values ask less often. The head default is the
-threshold selected on the frozen validation sweep in T5. For noul, 0.35
+for noul): lower values ask less often. The head asks when
+P(can_execute) <= threshold - exactly the evaluator's convention
+(p_ambiguous >= 0.05, `metrics()` uses >=); noul compares <. The head
+default is the threshold selected on the frozen validation sweep in
+T5, replayed through the hook's decision rule in
+tests/test_hook_default_path.py (43/44, one false-ask, zero misses).
+For noul, 0.35
 traded over-asking 0.238 for under-asking 0.348 on the same split,
 while 0.50 gave 0.524 / 0.130. Both are starting postures for
 dogfooding, not validated defaults.
