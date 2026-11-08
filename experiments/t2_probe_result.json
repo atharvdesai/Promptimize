@@ -1,0 +1,199 @@
+{
+ "trial": "T2-probes",
+ "what": "Frozen T2 pipeline scored on 20 model-authored synthetic diagnostic probes (NOT an independent human holdout; labels frozen pre-scoring, SHA256 in trials.jsonl)",
+ "overall": {
+  "acc": 0.65,
+  "n": 20,
+  "wilson95": [
+   0.433,
+   0.819
+  ]
+ },
+ "by_cell": {
+  "amb_longpath": {
+   "acc": 0.0,
+   "n": 5
+  },
+  "amb_short": {
+   "acc": 1.0,
+   "n": 5
+  },
+  "exec_longpath": {
+   "acc": 1.0,
+   "n": 5
+  },
+  "exec_short": {
+   "acc": 0.6,
+   "n": 5
+  }
+ },
+ "per_probe": [
+  {
+   "id": "A1",
+   "cell": "exec_longpath",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "gold_ambiguous": false,
+   "correct": true
+  },
+  {
+   "id": "A2",
+   "cell": "exec_longpath",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "gold_ambiguous": false,
+   "correct": true
+  },
+  {
+   "id": "A3",
+   "cell": "exec_longpath",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "gold_ambiguous": false,
+   "correct": true
+  },
+  {
+   "id": "A4",
+   "cell": "exec_longpath",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "gold_ambiguous": false,
+   "correct": true
+  },
+  {
+   "id": "A5",
+   "cell": "exec_longpath",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "gold_ambiguous": false,
+   "correct": true
+  },
+  {
+   "id": "B1",
+   "cell": "exec_short",
+   "p_ambiguous": 0.0082,
+   "ask": false,
+   "gold_ambiguous": false,
+   "correct": true
+  },
+  {
+   "id": "B2",
+   "cell": "exec_short",
+   "p_ambiguous": 0.5068,
+   "ask": true,
+   "gold_ambiguous": false,
+   "correct": false
+  },
+  {
+   "id": "B3",
+   "cell": "exec_short",
+   "p_ambiguous": 0.0002,
+   "ask": false,
+   "gold_ambiguous": false,
+   "correct": true
+  },
+  {
+   "id": "B4",
+   "cell": "exec_short",
+   "p_ambiguous": 0.9963,
+   "ask": true,
+   "gold_ambiguous": false,
+   "correct": false
+  },
+  {
+   "id": "B5",
+   "cell": "exec_short",
+   "p_ambiguous": 0.0028,
+   "ask": false,
+   "gold_ambiguous": false,
+   "correct": true
+  },
+  {
+   "id": "C1",
+   "cell": "amb_longpath",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "gold_ambiguous": true,
+   "correct": false
+  },
+  {
+   "id": "C2",
+   "cell": "amb_longpath",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "gold_ambiguous": true,
+   "correct": false
+  },
+  {
+   "id": "C3",
+   "cell": "amb_longpath",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "gold_ambiguous": true,
+   "correct": false
+  },
+  {
+   "id": "C4",
+   "cell": "amb_longpath",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "gold_ambiguous": true,
+   "correct": false
+  },
+  {
+   "id": "C5",
+   "cell": "amb_longpath",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "gold_ambiguous": true,
+   "correct": false
+  },
+  {
+   "id": "D1",
+   "cell": "amb_short",
+   "p_ambiguous": 1.0,
+   "ask": true,
+   "gold_ambiguous": true,
+   "correct": true
+  },
+  {
+   "id": "D2",
+   "cell": "amb_short",
+   "p_ambiguous": 1.0,
+   "ask": true,
+   "gold_ambiguous": true,
+   "correct": true
+  },
+  {
+   "id": "D3",
+   "cell": "amb_short",
+   "p_ambiguous": 1.0,
+   "ask": true,
+   "gold_ambiguous": true,
+   "correct": true
+  },
+  {
+   "id": "D4",
+   "cell": "amb_short",
+   "p_ambiguous": 1.0,
+   "ask": true,
+   "gold_ambiguous": true,
+   "correct": true
+  },
+  {
+   "id": "D5",
+   "cell": "amb_short",
+   "p_ambiguous": 1.0,
+   "ask": true,
+   "gold_ambiguous": true,
+   "correct": true
+  }
+ ],
+ "shortcut_signature": "A/D strong with B/C collapsed = surface-feature shortcut (length/paths)",
+ "caveats": [
+  "Model-authored probes: diagnostic only, no real-prompt generalization claim.",
+  "Single threshold/config from T2; probes share the author's phrasing quirks.",
+  "Failures preserved verbatim below; no retroactive probe edits."
+ ],
+ "ts": 1794101556.2450922
+}
