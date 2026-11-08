@@ -1,0 +1,90 @@
+{
+ "trial": "T2",
+ "what": "numpy logistic head on frozen LAYA ONNX mean-pooled embeddings (not weight tuning)",
+ "instruction_variant": "v2_discover (T1 winner)",
+ "train": {
+  "acc": 1.0,
+  "over": 0.0,
+  "under": 0.0,
+  "n": 332,
+  "thr": 0.05
+ },
+ "val": {
+  "acc": 0.977,
+  "over": 0.048,
+  "under": 0.0,
+  "n": 44,
+  "thr": 0.05
+ },
+ "val_acc_wilson95": [
+  0.882,
+  0.996
+ ],
+ "selected_config": {
+  "lr": 0.1,
+  "l2": 0.0001,
+  "thr": 0.05
+ },
+ "all_train_configs": {
+  "lr0.1_l20.0001": {
+   "best_thr": 0.05,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0
+  },
+  "lr0.1_l20.001": {
+   "best_thr": 0.05,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0
+  },
+  "lr0.1_l20.01": {
+   "best_thr": 0.1,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0
+  },
+  "lr0.3_l20.0001": {
+   "best_thr": 0.05,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0
+  },
+  "lr0.3_l20.001": {
+   "best_thr": 0.05,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0
+  },
+  "lr0.3_l20.01": {
+   "best_thr": 0.1,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0
+  },
+  "lr0.5_l20.0001": {
+   "best_thr": 0.05,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0
+  },
+  "lr0.5_l20.001": {
+   "best_thr": 0.05,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0
+  },
+  "lr0.5_l20.01": {
+   "best_thr": 0.1,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0
+  }
+ },
+ "caveats": [
+  "Val reused across sequential trials: directional, not an independent final evaluation.",
+  "ONNX third-party export; parity with upstream torch checkpoint unestablished.",
+  "Head trained on train.jsonl only (n=332); small-data logistic regression."
+ ],
+ "ts": 1794101373.1734834
+}
