@@ -24,17 +24,11 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from exp_laya_embeddings import (STATE_TMPL, embed_one, fit_logreg,
                                  load_agent, metrics, wilson, REPO)
+from gate_normalize import normalize  # single shared implementation (T5 contract)
 
 EMB_OUT = os.path.join(REPO, "experiments", "t5_embeddings.jsonl")
 OUT = os.path.join(REPO, "experiments", "t5_result.json")
 PROBES = os.path.join(REPO, "experiments", "t2_probes.jsonl")
-
-PATHLIKE = re.compile(r"^\S*(?:/|\.(?:py|tsx?|jsx?|json|ya?ml|md|go|rb|php|pkl|sql|css|html|sh|txt|toml|cfg|xml|csv|lock))\S*$", re.I)
-
-
-def normalize(prompt):
-    toks = [t for t in prompt.split() if not PATHLIKE.match(t)]
-    return re.sub(r"\s+", " ", " ".join(toks)).strip()
 
 
 def rows_for(split):
