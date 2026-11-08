@@ -18,7 +18,7 @@ import time
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from exp_laya_embeddings import fit_logreg, REPO
+from exp_laya_embeddings import fit_logreg, metrics, REPO
 
 TRAIN_EMB = os.path.join(REPO, "experiments", "t5_embeddings.jsonl")
 T5_RESULT = os.path.join(REPO, "experiments", "t5_result.json")
@@ -49,24 +49,21 @@ def main():
     }
     # Measure the ARTIFACT AS SHIPPED (post-rounding), not the pre-export
     # floats: borderline rows near the threshold can flip under 8-dp
-    # rounding, and the shipped numbers are the ones that matter.
+    # rounding, and the shipped numbers are the ones that matter. Uses the
+    # shared metrics(): over/under are PER-CLASS rates (false-asks over
+    # executable rows, misses over ambiguous rows), not fractions of n.
     def sig(z):
         return 1.0 / (1.0 + np.exp(-z))
     wr = np.array(artifact["w"]); mur = np.array(artifact["mu"]); sdr = np.array(artifact["sd"])
     measured = {}
     for split in ("train", "val"):
         rs = [json.loads(l) for l in open(TRAIN_EMB) if json.loads(l)["split"] == split]
-        ok = over = under = 0
-        for r in rs:
-            Xr = np.array(r["emb"])
-            p_amb = float(sig(((Xr - mur) / sdr) @ wr + artifact["b"]))
-            ask = p_amb >= artifact["threshold"]
-            if (ask and r["label"] == 1) or (not ask and r["label"] == 0): ok += 1
-            elif ask: over += 1
-            else: under += 1
-        n = len(rs)
-        measured[split] = {"acc": round(ok / n, 3), "over": round(over / n, 3),
-                           "under": round(under / n, 3), "n": n}
+        probs = np.array([float(sig(((np.array(r["emb"]) - mur) / sdr) @ wr + artifact["b"]))
+                          for r in rs])
+        y = np.array([r["label"] for r in rs])
+        m = metrics(probs, y, artifact["threshold"])
+        m.pop("thr", None)
+        measured[split] = m
     artifact["measured"] = measured
     artifact["blind_spot"] = ("long prompts (>=200 chars): ambiguous recall 0/8 on probe "
                               "families 1+2 - see trials P2/P3")
