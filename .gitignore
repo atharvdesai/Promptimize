@@ -7,3 +7,5 @@ model.onnx
 plugin/model.onnx
 .promptimize/
 experiments/t1_probs.jsonl
+experiments/t2_embeddings.jsonl
+experiments/t2_probe_embeddings.jsonl
