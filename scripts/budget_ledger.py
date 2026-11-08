@@ -149,6 +149,22 @@ class BudgetLedger:
                 fcntl.flock(lock, fcntl.LOCK_UN)
         return result
 
+    def set_cap(self, new_cap_usd, note=""):
+        """Record a cap change with provenance. Total across the experiment."""
+        def _do(ledger):
+            old = ledger._state.get("cap_usd", ledger.cap_usd)
+            ledger._state["cap_usd"] = float(new_cap_usd)
+            ledger.cap_usd = float(new_cap_usd)
+            ledger._event(
+                "cap_update",
+                "cap change",
+                old_cap_usd=old,
+                new_cap_usd=float(new_cap_usd),
+                note=note,
+            )
+            return float(new_cap_usd)
+        return self._locked(_do)
+
     def _require_state(self):
         if self._state is None:
             raise LedgerNotProvisioned(
@@ -167,7 +183,8 @@ class BudgetLedger:
         return state["spent_usd"] + reserved
 
     def remaining_usd(self):
-        return self.cap_usd - self.committed_usd()
+        state = self._require_state()
+        return state.get("cap_usd", self.cap_usd) - self.committed_usd()
 
     def provision(self, note=""):
         """Explicitly initialize this machine's allowance. Fails if state
@@ -179,6 +196,7 @@ class BudgetLedger:
         self._state = {
             "spent_usd": 0.0,
             "reserved": {},
+            "cap_usd": self.cap_usd,
             "events": [
                 {
                     "ts": time.time(),
@@ -202,17 +220,19 @@ class BudgetLedger:
         def _do(ledger):
             reserve = cost_usd(output_tokens=max_output_tokens,
                                cache_write_tokens=est_input_tokens)
-            if reserve > ledger.remaining_usd() + 1e-12:
+            cap = ledger._state.get("cap_usd", ledger.cap_usd)
+            remaining = cap - ledger.committed_usd()
+            if reserve > remaining + 1e-12:
                 ledger._event(
                     "refused",
                     purpose,
                     needed_usd=round(reserve, 6),
-                    remaining_usd=round(ledger.remaining_usd(), 6),
+                    remaining_usd=round(remaining, 6),
                 )
                 ledger._save()  # keep the refusal on the audit trail
                 raise BudgetExhausted(
                     "reserving $%.6f would exceed the $%.2f cap (%.6f remaining)"
-                    % (reserve, ledger.cap_usd, ledger.remaining_usd())
+                    % (reserve, cap, remaining)
                 )
             rid = uuid.uuid4().hex[:16]
             ledger._state["reserved"][rid] = {
@@ -293,7 +313,7 @@ def _main(argv):
     parser = argparse.ArgumentParser(
         description="Provision the Promptimize budget ledger on this machine."
     )
-    parser.add_argument("command", choices=["init", "status"])
+    parser.add_argument("command", choices=["init", "status", "setcap"])
     parser.add_argument(
         "--cap",
         type=float,
@@ -307,7 +327,12 @@ def _main(argv):
     args = parser.parse_args(argv)
 
     ledger = BudgetLedger(path=args.path, cap_usd=args.cap)
-    if args.command == "init":
+    if args.command == "setcap":
+        if args.cap is None:
+            parser.error("setcap requires --cap (new total allowance in USD)")
+        ledger.set_cap(args.cap, note=args.note)
+        print("cap updated to $%.2f on %s" % (ledger.cap_usd, ledger.path))
+    elif args.command == "init":
         if args.cap is None:
             parser.error("init requires --cap (remaining allowance in USD)")
         ledger.provision(note=args.note)
@@ -322,8 +347,8 @@ def _main(argv):
                 % (
                     state["spent_usd"],
                     sum(r["reserve_usd"] for r in state["reserved"].values()),
-                    ledger.cap_usd - ledger.committed_usd(),
-                    ledger.cap_usd,
+                    state.get("cap_usd", ledger.cap_usd) - ledger.committed_usd(),
+                    state.get("cap_usd", ledger.cap_usd),
                 )
             )
 
