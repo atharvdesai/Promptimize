@@ -1,0 +1,271 @@
+{
+ "trial": "LC1",
+ "what": "learning curves for the frozen-embedding logistic head: stratified subsamples of train (5 seeds/size), measured on val",
+ "config": {
+  "lr": 0.3,
+  "l2": 0.001,
+  "thr": 0.5,
+  "sizes": [
+   32,
+   64,
+   128,
+   256,
+   332
+  ],
+  "seeds": [
+   0,
+   1,
+   2,
+   3,
+   4
+  ]
+ },
+ "curves": {
+  "32": {
+   "runs": [
+    {
+     "seed": 0,
+     "acc": 0.977,
+     "over": 0.048,
+     "under": 0.0,
+     "n": 44,
+     "thr": 0.5
+    },
+    {
+     "seed": 1,
+     "acc": 1.0,
+     "over": 0.0,
+     "under": 0.0,
+     "n": 44,
+     "thr": 0.5
+    },
+    {
+     "seed": 2,
+     "acc": 0.977,
+     "over": 0.048,
+     "under": 0.0,
+     "n": 44,
+     "thr": 0.5
+    },
+    {
+     "seed": 3,
+     "acc": 1.0,
+     "over": 0.0,
+     "under": 0.0,
+     "n": 44,
+     "thr": 0.5
+    },
+    {
+     "seed": 4,
+     "acc": 0.977,
+     "over": 0.0,
+     "under": 0.043,
+     "n": 44,
+     "thr": 0.5
+    }
+   ],
+   "acc_mean": 0.986,
+   "acc_std": 0.011,
+   "over_mean": 0.019,
+   "under_mean": 0.009
+  },
+  "64": {
+   "runs": [
+    {
+     "seed": 0,
+     "acc": 0.955,
+     "over": 0.0,
+     "under": 0.087,
+     "n": 44,
+     "thr": 0.5
+    },
+    {
+     "seed": 1,
+     "acc": 1.0,
+     "over": 0.0,
+     "under": 0.0,
+     "n": 44,
+     "thr": 0.5
+    },
+    {
+     "seed": 2,
+     "acc": 0.977,
+     "over": 0.048,
+     "under": 0.0,
+     "n": 44,
+     "thr": 0.5
+    },
+    {
+     "seed": 3,
+     "acc": 0.977,
+     "over": 0.0,
+     "under": 0.043,
+     "n": 44,
+     "thr": 0.5
+    },
+    {
+     "seed": 4,
+     "acc": 0.977,
+     "over": 0.0,
+     "under": 0.043,
+     "n": 44,
+     "thr": 0.5
+    }
+   ],
+   "acc_mean": 0.977,
+   "acc_std": 0.014,
+   "over_mean": 0.01,
+   "under_mean": 0.035
+  },
+  "128": {
+   "runs": [
+    {
+     "seed": 0,
+     "acc": 0.977,
+     "over": 0.048,
+     "under": 0.0,
+     "n": 44,
+     "thr": 0.5
+    },
+    {
+     "seed": 1,
+     "acc": 0.977,
+     "over": 0.048,
+     "under": 0.0,
+     "n": 44,
+     "thr": 0.5
+    },
+    {
+     "seed": 2,
+     "acc": 1.0,
+     "over": 0.0,
+     "under": 0.0,
+     "n": 44,
+     "thr": 0.5
+    },
+    {
+     "seed": 3,
+     "acc": 1.0,
+     "over": 0.0,
+     "under": 0.0,
+     "n": 44,
+     "thr": 0.5
+    },
+    {
+     "seed": 4,
+     "acc": 0.977,
+     "over": 0.048,
+     "under": 0.0,
+     "n": 44,
+     "thr": 0.5
+    }
+   ],
+   "acc_mean": 0.986,
+   "acc_std": 0.011,
+   "over_mean": 0.029,
+   "under_mean": 0.0
+  },
+  "256": {
+   "runs": [
+    {
+     "seed": 0,
+     "acc": 0.977,
+     "over": 0.048,
+     "under": 0.0,
+     "n": 44,
+     "thr": 0.5
+    },
+    {
+     "seed": 1,
+     "acc": 0.977,
+     "over": 0.048,
+     "under": 0.0,
+     "n": 44,
+     "thr": 0.5
+    },
+    {
+     "seed": 2,
+     "acc": 0.977,
+     "over": 0.048,
+     "under": 0.0,
+     "n": 44,
+     "thr": 0.5
+    },
+    {
+     "seed": 3,
+     "acc": 0.977,
+     "over": 0.048,
+     "under": 0.0,
+     "n": 44,
+     "thr": 0.5
+    },
+    {
+     "seed": 4,
+     "acc": 0.977,
+     "over": 0.048,
+     "under": 0.0,
+     "n": 44,
+     "thr": 0.5
+    }
+   ],
+   "acc_mean": 0.977,
+   "acc_std": 0.0,
+   "over_mean": 0.048,
+   "under_mean": 0.0
+  },
+  "332": {
+   "runs": [
+    {
+     "seed": 0,
+     "acc": 0.977,
+     "over": 0.048,
+     "under": 0.0,
+     "n": 44,
+     "thr": 0.5
+    },
+    {
+     "seed": 1,
+     "acc": 0.977,
+     "over": 0.048,
+     "under": 0.0,
+     "n": 44,
+     "thr": 0.5
+    },
+    {
+     "seed": 2,
+     "acc": 0.977,
+     "over": 0.048,
+     "under": 0.0,
+     "n": 44,
+     "thr": 0.5
+    },
+    {
+     "seed": 3,
+     "acc": 0.977,
+     "over": 0.048,
+     "under": 0.0,
+     "n": 44,
+     "thr": 0.5
+    },
+    {
+     "seed": 4,
+     "acc": 0.977,
+     "over": 0.048,
+     "under": 0.0,
+     "n": 44,
+     "thr": 0.5
+    }
+   ],
+   "acc_mean": 0.977,
+   "acc_std": 0.0,
+   "over_mean": 0.048,
+   "under_mean": 0.0
+  }
+ },
+ "caveats": [
+  "Val reused as a measurement across curve points - directional, not an independent evaluation.",
+  "Head is the numpy logistic comparator (T2-style), not the official RLCD path (resource-blocked: torch load OOM-killed in 2GB sandbox).",
+  "Subsamples are stratified random, not grouped (dataset carries no group ids beyond ambiguity_type).",
+  "Same single-author synthetic data - curve shape reflects THIS data's redundancy, not real-prompt learning."
+ ]
+}
