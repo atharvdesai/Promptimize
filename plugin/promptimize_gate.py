@@ -16,18 +16,37 @@ prompt. Usage totals (tokens, estimated cost, latency) go to
 
 Config (env):
   PROMPTIMIZE_LAYA_ONNX       path to model.onnx (default: plugin/model.onnx)
-  PROMPTIMIZE_THRESHOLD       ask when P(can_execute) < this (default 0.35)
-  PROMPTIMIZE_MODE            "hybrid" (LAYA decides, Haiku writes the
+  PROMPTIMIZE_DECIDER         "head", "noul", or "auto" (default auto:
+                              head when plugin/gate_head.json exists, else noul)
+  PROMPTIMIZE_GATE_HEAD       path to the head artifact (default: plugin/gate_head.json)
+  PROMPTIMIZE_THRESHOLD       ask when P(can_execute) < this (defaults: 0.95
+                              for the head decider, 0.35 for noul)
+  PROMPTIMIZE_MODE            "hybrid" (local decider scores, Haiku writes the
                               question; default) or "haiku" (Haiku does
                               both - the comparison arm; no local model)
   PROMPTIMIZE_ANTHROPIC_KEY_FILE  file containing the Anthropic API key
   PROMPTIMIZE_BUDGET_USD      total spend cap, fail closed (default 2.00)
   PROMPTIMIZE_DISABLED        set to 1 to bypass the gate entirely
 
-Threshold note: 0.35 comes from the frozen-validation sweep (n=44):
-over-asking 0.238 / under-asking 0.348 there, versus 0.524 / 0.130 at
-0.50. It is a dogfooding posture chosen to bias against false
-interruptions, not a value validated on real usage. Tune after real use.
+Deciders. "noul" is LAYA's zero-shot head with the instructions below:
+measured val acc 0.682, over-asking 0.238 / under-asking 0.348 at 0.35
+(n=44, frozen split). "head" is the trained numpy logistic head from
+trial T5 on the same frozen LAYA embeddings with input normalization
+(gate_normalize.normalize, applied identically at train and inference
+time): measured val acc 0.977, over 0.023 / under 0.000 at p_ambiguous
+0.05 (artifact as shipped, n=44, frozen split). Both figures are one validation split reused across trials -
+directional, not validated on real usage. The head's measured blind
+spot is LONG prompts (>= 200 chars): ambiguous-recall 0/8 on probe
+families 1+2 (trials P2/P3 - replicates on a cross-encoder, so it is
+likely dataset surface correlation, not the encoder). Decisions in the
+blind-spot zone are logged with blind_spot=true so dogfooding data can
+be stratified on it.
+
+Noul threshold note: 0.35 comes from the frozen-validation sweep
+(n=44): over-asking 0.238 / under-asking 0.348 there, versus
+0.524 / 0.130 at 0.50. It is a dogfooding posture chosen to bias
+against false interruptions, not a value validated on real usage.
+Tune after real use.
 
 Claude Code wiring (settings.json):
   "hooks": {"UserPromptSubmit": [{"hooks": [{"type": "command",
@@ -42,14 +61,20 @@ import time
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO_ROOT, "scripts"))
 
+from gate_normalize import normalize, in_measured_blind_spot
+
 USAGE_LOG = os.path.expanduser("~/.promptimize/usage.jsonl")
+STATE_TMPL = 'A user gave a coding agent this request: "%s"'
 NOUL_INSTRUCTIONS = (
     "Can a coding agent execute this request correctly without asking "
     "the user a clarifying question?"
 )
 MIN_PROMPT_CHARS = 25
+HEAD_PATH_DEFAULT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gate_head.json")
 
 _agent = None
+_head = None
+_head_path = None
 
 
 def _log(kind, **fields):
@@ -65,8 +90,22 @@ def _log(kind, **fields):
         pass
 
 
-def decide(prompt):
-    """P(can_execute) from the local LAYA checkpoint. Raises on failure."""
+def decider_name():
+    """Which local decider scores prompts. auto: head if the artifact exists."""
+    d = os.environ.get("PROMPTIMIZE_DECIDER", "auto")
+    if d == "auto":
+        d = "head" if os.path.exists(os.environ.get("PROMPTIMIZE_GATE_HEAD", HEAD_PATH_DEFAULT)) else "noul"
+    return d
+
+
+def default_threshold(decider):
+    # head: ask when P(can_execute) < 1 - 0.05 (T5 selected p_ambiguous thr).
+    # noul: 0.35 dogfooding posture (see header note).
+    return "0.95" if decider == "head" else "0.35"
+
+
+def _load_agent():
+    """Load the local LAYA checkpoint once. Raises on failure."""
     global _agent
     if _agent is None:
         import onnxruntime as ort
@@ -93,11 +132,72 @@ def decide(prompt):
         _agent = laya.load(
             "codenamev/laya-onnx", backend="onnx", subfolder="english", onnx_path=onnx_path
         )
-    state = 'A user gave a coding agent this request: "%s"' % prompt
-    result = _agent.predict(
-        state, {"can_execute": {"type": "noul", "instructions": NOUL_INSTRUCTIONS}}
+    return _agent
+
+
+def decide(prompt):
+    """P(can_execute). Dispatches to the selected decider. Raises on failure."""
+    if decider_name() == "head":
+        return 1.0 - score_head(embed_prompt(prompt), load_head())
+    return decide_noul(prompt)
+
+
+def decide_noul(prompt):
+    """P(can_execute) from LAYA's zero-shot noul head."""
+    agent = _load_agent()
+    result = agent.predict(
+        STATE_TMPL % prompt, {"can_execute": {"type": "noul", "instructions": NOUL_INSTRUCTIONS}}
     )
     return float(result["answers"]["can_execute"]["noul"])
+
+
+def load_head(path=None):
+    """The trained T5 logistic head artifact (small numpy head, JSON)."""
+    global _head, _head_path
+    if path is None:
+        path = os.environ.get("PROMPTIMIZE_GATE_HEAD", HEAD_PATH_DEFAULT)
+    if _head is None or _head_path != path:
+        with open(path) as f:
+            artifact = json.load(f)
+        if artifact.get("format") != "promptimize-gate-head/v1":
+            raise ValueError("unsupported gate head format: %r" % artifact.get("format"))
+        _head, _head_path = artifact, path
+    return _head
+
+
+def embed_prompt(prompt):
+    """Frozen LAYA embedding of the NORMALIZED prompt (T5 contract: the
+    same gate_normalize.normalize used to train the head)."""
+    import numpy as np
+    from laya.onnx_agent import _collate_items_numpy
+
+    agent = _load_agent()
+    question = {"can_execute": {"type": "noul", "instructions": NOUL_INSTRUCTIONS}}
+    internal = {qid: agent._to_internal(q) for qid, q in question.items()}
+    ids = list(question.keys())
+    max_len = agent.cfg.get("max_len", 512)
+    head_max_len = agent.cfg.get("head_max_len", 192)
+    items = agent._encode_state(STATE_TMPL % normalize(prompt), ids, internal, max_len, head_max_len)
+    inputs = _collate_items_numpy([items], agent.tok.pad_token_id)
+    hidden = agent.session.run(["last_hidden_state"], inputs)[0][0]  # (seq, dim)
+    mask = inputs["attention_mask"][0].astype(np.float64)  # (seq,)
+    return (hidden * mask[:, None]).sum(axis=0) / max(mask.sum(), 1.0)
+
+
+def score_head(emb, head):
+    """p_ambiguous = sigmoid(standardize(emb) @ w + b). Pure Python: the
+    head is ~1k floats, no numpy needed on the hot path."""
+    w, mu, sd, b = head["w"], head["mu"], head["sd"], head["b"]
+    if len(emb) != len(w):
+        raise ValueError("embedding dim %d != head dim %d" % (len(emb), len(w)))
+    z = b
+    for e, m, s, wi in zip(emb, mu, sd, w):
+        z += (float(e) - m) / s * wi
+    # numerically stable sigmoid
+    if z >= 0:
+        return 1.0 / (1.0 + pow(2.718281828459045, -z))
+    ez = pow(2.718281828459045, z)
+    return ez / (1.0 + ez)
 
 
 def write_question(prompt, ledger):
@@ -116,7 +216,8 @@ def run(stdin_text):
     if len(prompt) < MIN_PROMPT_CHARS or prompt.startswith("/"):
         return None
 
-    threshold = float(os.environ.get("PROMPTIMIZE_THRESHOLD", "0.35"))
+    decider = decider_name()
+    threshold = float(os.environ.get("PROMPTIMIZE_THRESHOLD", default_threshold(decider)))
     mode = os.environ.get("PROMPTIMIZE_MODE", "hybrid")
     t0 = time.time()
 
@@ -152,7 +253,9 @@ def run(stdin_text):
     else:
         prob = decide(prompt)
         decision_ms = int((time.time() - t0) * 1000)
-        _log("decision", mode=mode, prob=round(prob, 4), threshold=threshold, latency_ms=decision_ms)
+        _log("decision", mode=mode, decider=decider, prob=round(prob, 4),
+             threshold=threshold, latency_ms=decision_ms,
+             blind_spot=in_measured_blind_spot(prompt))
         if prob >= threshold:
             return None
         try:
