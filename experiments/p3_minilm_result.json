@@ -1,0 +1,225 @@
+{
+ "trial": "P3",
+ "what": "cross-encoder replication: T5 pipeline with all-MiniLM-L6-v2 instead of LAYA ONNX; scored on frozen probe families 1+2",
+ "encoder": "sentence-transformers/all-MiniLM-L6-v2 (ONNX, 384-d, mean-pooled, L2-norm, truncation 256)",
+ "selected_config": {
+  "lr": 0.1,
+  "l2": 0.0001,
+  "thr": 0.05
+ },
+ "train": {
+  "acc": 1.0,
+  "over": 0.0,
+  "under": 0.0,
+  "n": 332,
+  "thr": 0.05
+ },
+ "val": {
+  "acc": 0.909,
+  "over": 0.143,
+  "under": 0.043,
+  "n": 44,
+  "thr": 0.05
+ },
+ "val_acc_wilson95": [
+  0.788,
+  0.964
+ ],
+ "probe1_cells": {
+  "amb_longpath": {
+   "acc": 0.2,
+   "n": 5
+  },
+  "amb_short": {
+   "acc": 1.0,
+   "n": 5
+  },
+  "exec_longpath": {
+   "acc": 1.0,
+   "n": 5
+  },
+  "exec_short": {
+   "acc": 1.0,
+   "n": 5
+  }
+ },
+ "probe2_cells": {
+  "amb_long_nopath": {
+   "acc": 0.25,
+   "n": 4
+  },
+  "amb_longpath_v2": {
+   "acc": 0.25,
+   "n": 4
+  },
+  "amb_short_v2": {
+   "acc": 0.25,
+   "n": 4
+  },
+  "exec_long_nopath": {
+   "acc": 0.75,
+   "n": 4
+  },
+  "exec_longpath_v2": {
+   "acc": 1.0,
+   "n": 4
+  },
+  "exec_short_v2": {
+   "acc": 0.75,
+   "n": 4
+  }
+ },
+ "probe2_per_probe": [
+  {
+   "id": "E1",
+   "cell": "exec_longpath_v2",
+   "p_ambiguous": 0.0,
+   "correct": true
+  },
+  {
+   "id": "A1",
+   "cell": "amb_longpath_v2",
+   "p_ambiguous": 0.0004,
+   "correct": false
+  },
+  {
+   "id": "E2",
+   "cell": "exec_longpath_v2",
+   "p_ambiguous": 0.0007,
+   "correct": true
+  },
+  {
+   "id": "A2",
+   "cell": "amb_longpath_v2",
+   "p_ambiguous": 0.064,
+   "correct": true
+  },
+  {
+   "id": "E3",
+   "cell": "exec_longpath_v2",
+   "p_ambiguous": 0.0013,
+   "correct": true
+  },
+  {
+   "id": "A3",
+   "cell": "amb_longpath_v2",
+   "p_ambiguous": 0.0347,
+   "correct": false
+  },
+  {
+   "id": "E4",
+   "cell": "exec_longpath_v2",
+   "p_ambiguous": 0.0,
+   "correct": true
+  },
+  {
+   "id": "A4",
+   "cell": "amb_longpath_v2",
+   "p_ambiguous": 0.0,
+   "correct": false
+  },
+  {
+   "id": "E5",
+   "cell": "exec_long_nopath",
+   "p_ambiguous": 0.0,
+   "correct": true
+  },
+  {
+   "id": "A5",
+   "cell": "amb_long_nopath",
+   "p_ambiguous": 0.0,
+   "correct": false
+  },
+  {
+   "id": "E6",
+   "cell": "exec_long_nopath",
+   "p_ambiguous": 0.1306,
+   "correct": false
+  },
+  {
+   "id": "A6",
+   "cell": "amb_long_nopath",
+   "p_ambiguous": 0.9652,
+   "correct": true
+  },
+  {
+   "id": "E7",
+   "cell": "exec_long_nopath",
+   "p_ambiguous": 0.0001,
+   "correct": true
+  },
+  {
+   "id": "A7",
+   "cell": "amb_long_nopath",
+   "p_ambiguous": 0.0,
+   "correct": false
+  },
+  {
+   "id": "E8",
+   "cell": "exec_long_nopath",
+   "p_ambiguous": 0.0,
+   "correct": true
+  },
+  {
+   "id": "A8",
+   "cell": "amb_long_nopath",
+   "p_ambiguous": 0.0002,
+   "correct": false
+  },
+  {
+   "id": "E9",
+   "cell": "exec_short_v2",
+   "p_ambiguous": 0.3878,
+   "correct": false
+  },
+  {
+   "id": "A9",
+   "cell": "amb_short_v2",
+   "p_ambiguous": 0.0021,
+   "correct": false
+  },
+  {
+   "id": "E10",
+   "cell": "exec_short_v2",
+   "p_ambiguous": 0.0,
+   "correct": true
+  },
+  {
+   "id": "A10",
+   "cell": "amb_short_v2",
+   "p_ambiguous": 0.0,
+   "correct": false
+  },
+  {
+   "id": "E11",
+   "cell": "exec_short_v2",
+   "p_ambiguous": 0.0,
+   "correct": true
+  },
+  {
+   "id": "A11",
+   "cell": "amb_short_v2",
+   "p_ambiguous": 0.0,
+   "correct": false
+  },
+  {
+   "id": "E12",
+   "cell": "exec_short_v2",
+   "p_ambiguous": 0.0,
+   "correct": true
+  },
+  {
+   "id": "A12",
+   "cell": "amb_short_v2",
+   "p_ambiguous": 0.6625,
+   "correct": true
+  }
+ ],
+ "status": "DEVELOPMENT diagnostics - cross-encoder comparison, not an acceptance test",
+ "caveats": [
+  "Val reused across trials - directional.",
+  "MiniLM truncates at 256 tokens vs LAYA's longer window; long-prompt behavior partly reflects truncation.",
+  "Different embedding model, same dataset: a shared failure implicates the data's surface correlations, not proof."
+ ],
+ "ts": 1794158234.496341
+}
