@@ -11,3 +11,4 @@ experiments/t2_embeddings.jsonl
 experiments/t2_probe_embeddings.jsonl
 experiments/t3_aug_embeddings.jsonl
 experiments/t5_embeddings.jsonl
+experiments/probe2_embeddings.jsonl
