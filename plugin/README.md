@@ -58,23 +58,23 @@ subscription. It is read at call time, never logged or echoed.
 
 **Budget provisioning (required once per machine):** the approved spend
 cap is a TOTAL across the whole experiment, not per install or per
-machine. The ledger refuses every paid call until explicitly
-provisioned with the REMAINING allowance - approved total minus
-everything already spent (and minus any outstanding reservations). This
-experiment has already spent $0.004489 of the approved $2.00 (as of
-2026-11-07), so the remaining allowance is $1.995511 - check first,
-spend may have moved:
+machine - the user approved $10.00 total (2026-11-07). The ledger
+refuses every paid call until explicitly provisioned with the REMAINING
+allowance - approved total minus everything already spent (and minus
+any outstanding reservations). This experiment has already spent
+$0.004489 of the approved $10.00 (as of 2026-11-08), so the remaining
+allowance is $9.995511 - check first, spend may have moved:
 
 ```bash
 python3 scripts/budget_ledger.py status   # on the machine that already spent
 # on any new machine, provision ONLY the remaining allowance:
-python3 scripts/budget_ledger.py init --cap 1.995511 --note 'remaining of approved $2'
+python3 scripts/budget_ledger.py init --cap 9.995511 --note 'remaining of approved $10'
 ```
 
 Running on several machines at once: either keep the gate on ONE
 machine under the single shared cap, or explicitly PARTITION the
-remaining allowance between them (e.g. $1.00 on the laptop and
-$0.995511 on the desktop). Never provision the same remaining amount on
+remaining allowance between them (e.g. $5.00 on the laptop and
+$4.995511 on the desktop). Never provision the same remaining amount on
 two machines - that would double the approved total.
 
 Before each paid call the hook asks the provider's free token-counting
@@ -90,7 +90,8 @@ stop-before-cap accounting, not an exact billing guarantee.
 - Decision: local, free, ~0.3 s, offline. No network.
 - Question drafting (only on flagged prompts): one Haiku 5.5 call,
   ~1,500 tokens in worst case. Hard spend cap via
-  `PROMPTIMIZE_BUDGET_USD` (default `$2.00`); the cap fails closed (calls
+  `PROMPTIMIZE_BUDGET_USD` (the machine-local partition of the approved
+  $10 experiment total); the cap fails closed (calls
   stop) while the hook fails open (your prompts always go through).
 - Logs usage totals only (`~/.promptimize/usage.jsonl`): tokens,
   estimated cost, latency. **No prompt text is logged.** Your prompt
@@ -112,7 +113,22 @@ stop-before-cap accounting, not an exact billing guarantee.
 
 ## Tuning
 
-`PROMPTIMIZE_THRESHOLD` (default `0.35`): lower values ask less often.
-On the frozen validation split (n=44), 0.35 traded over-asking 0.238 for
-under-asking 0.348, while 0.50 gave 0.524 / 0.130. This is a starting
-posture for dogfooding, not a validated default.
+`PROMPTIMIZE_DECIDER` (default `auto`): which local decider scores
+prompts. `auto` uses the trained head when `plugin/gate_head.json` is
+present (it ships with the repo), else the noul decider.
+- `head`: the numpy logistic head from trial T5 on frozen LAYA
+  embeddings with input normalization (`scripts/gate_normalize.py`,
+  applied at train and inference time). Measured on the frozen
+  validation split (n=44): acc 0.977, over-asking 0.023, under-asking
+  0.000. Known blind spot, also measured: LONG prompts (>= 200 chars) -
+  ambiguous recall 0/8 on the probe families (trials P2/P3; replicates
+  on a cross-encoder, so likely a dataset artifact, not the encoder).
+  Such decisions are logged with `blind_spot: true`.
+- `noul`: LAYA's zero-shot head. Measured val acc 0.682.
+
+`PROMPTIMIZE_THRESHOLD` (defaults: `0.95` for the head decider, `0.35`
+for noul): lower values ask less often. The head default is the
+threshold selected on the frozen validation sweep in T5. For noul, 0.35
+traded over-asking 0.238 for under-asking 0.348 on the same split,
+while 0.50 gave 0.524 / 0.130. Both are starting postures for
+dogfooding, not validated defaults.
