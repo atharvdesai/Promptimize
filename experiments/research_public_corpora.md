@@ -69,3 +69,20 @@ Nothing has been downloaded or used yet.
 - https://huggingface.co/datasets/Suzhen/CodeChat + https://huggingface.co/api/datasets/Suzhen/CodeChat (odc-by, ungated, WildChat-derived)
 - https://raw.githubusercontent.com/vaibhav4595/ClarQ/master/README.md (CC BY 4.0, StackExchange source)
 - https://aclanthology.org/2020.acl-main.651/ (ClarQ paper)
+
+## Review constraints (Nov 7, 2026 - applied before any download or use)
+
+1. Verify upstream collection/consent, exact subset provenance and license scope before
+   downloading or using CodeChat or WildChat. An ODC-BY database license does not by itself
+   settle rights in individual conversations or privacy.
+2. User-only prompts can still contain private or third-party data, and prompts alone may
+   omit conversation context needed for valid labels - keep enough context to label
+   honestly, exclude the rest.
+3. Start with a bounded, minimum-necessary sample for evaluation before any larger use.
+4. Exclude sensitive content entirely (category-level exclusion), not just regex scanning.
+5. Retain attribution and exact source revisions for anything used.
+6. Never upload raw conversations to paid models by default.
+7. ClarQ is not usable for training until its license mismatch (stated CC BY vs upstream
+   CC BY-SA) is resolved.
+8. Treat every corpus as a candidate, not verified clean, until these checks pass.
+9. Probe family 2 stays diagnostic-only framing; ongoing total budget ($10 cap) unchanged.
