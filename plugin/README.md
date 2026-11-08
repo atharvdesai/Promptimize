@@ -119,11 +119,14 @@ present (it ships with the repo), else the noul decider.
 - `head`: the numpy logistic head from trial T5 on frozen LAYA
   embeddings with input normalization (`scripts/gate_normalize.py`,
   applied at train and inference time). Measured on the frozen
-  validation split (n=44): acc 0.977, over-asking 0.023, under-asking
-  0.000. Known blind spot, also measured: LONG prompts (>= 200 chars) -
-  ambiguous recall 0/8 on the probe families (trials P2/P3; replicates
-  on a cross-encoder, so likely a dataset artifact, not the encoder).
-  Such decisions are logged with `blind_spot: true`.
+  validation split (n=44): acc 0.977, over-asking 0.048, under-asking
+  0.000 - best measured on a split reused across trials, directional,
+  not a validated accuracy upgrade. Known blind spot, also measured:
+  LONG prompts - ambiguous recall 0/8 on the probe families (trials
+  P2/P3; replicates on a cross-encoder, so likely a dataset artifact,
+  not the encoder). Decisions on prompts >= 200 chars (a heuristic flag
+  from the probe failure zone, not a validated boundary) are logged
+  with `blind_spot: true`.
 - `noul`: LAYA's zero-shot head. Measured val acc 0.682.
 
 `PROMPTIMIZE_THRESHOLD` (defaults: `0.95` for the head decider, `0.35`
