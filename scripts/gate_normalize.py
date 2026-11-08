@@ -37,7 +37,9 @@ def normalize(prompt: str) -> str:
 # Measured blind spot: long requests are the cell the current pipeline
 # gets wrong (probe families 1+2: long-ambiguous recall 0/8). The gate
 # logs this flag so dogfooding data separates blind-spot decisions from
-# the rest. 200 chars is the lower bound of the probe failure zone.
+# the rest. 200 chars is a HEURISTIC flag derived from the probe
+# failure zone (every long-ambiguous probe exceeds it) - it is not a
+# validated boundary; short prompts can be ambiguous and long ones clear.
 BLIND_SPOT_MIN_CHARS = 200
 
 
