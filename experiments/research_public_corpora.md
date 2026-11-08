@@ -86,3 +86,36 @@ Nothing has been downloaded or used yet.
    CC BY-SA) is resolved.
 8. Treat every corpus as a candidate, not verified clean, until these checks pass.
 9. Probe family 2 stays diagnostic-only framing; ongoing total budget ($10 cap) unchanged.
+
+## Verification results (Nov 8, 2026, ~1 AM) - desk research, nothing downloaded
+
+### WildChat upstream collection/consent: VERIFIED (paper arxiv 2405.01470)
+- Two-step explicit consent: "User Consent for Data Collection, Use, and Sharing" plus a
+  secondary confirmation; chat access only after consenting (paper Appendix B, Figures 8-9).
+- PII anonymized with Microsoft Presidio + Spacy NER + custom rules across names, phones,
+  emails, credit cards, URLs in 10 languages. IPs hashed; headers reduced to browser +
+  accept-language; toxic conversations removed from the current release.
+- License ODC-BY (retroactive since 2024-06-26).
+
+### CodeChat derivation chain: VERIFIED for v1 (paper arxiv 2509.10402v1)
+- Filter: WildChat conversations whose LLM turns contain triple-backtick code blocks -
+  82,845 conversations (9.9% of WildChat), 311,161 turns, 26,085 users (distinct hashed IPs).
+- "All other metadata from WildChat is inherited without changes" - NO additional PII
+  screening by CodeChat; it relies on WildChat's automated scrub.
+- v2.0 (587,568 conversations, current HF main @1681793a6cfb27b68c1f285bd1e78588132bc1c1)
+  is NOT paper-documented; only the card describes it. Exact revision to pin if used:
+  main @1681793a6cfb27b68c1f285bd1e78588132bc1c1 (no tags/branches pin v1 separately).
+
+### What this does and does not settle
+- Settled: a real consent mechanism existed upstream; the derivation filter is simple and
+  documented (v1); full conversation context is retained (68% multi-turn), so labels can
+  use context rather than prompt-only text.
+- Not settled: automated PII scrubbing is not proof of cleanliness (pasted private code or
+  secrets can survive NER); ODC-BY is a database license and does not by itself settle
+  rights in individual conversations; v2's exact construction is undocumented.
+- Standing rules for any use: user turns only (assistant turns are OpenAI outputs - never
+  training input); bounded minimum-necessary EVALUATION sample first; category-level
+  sensitive-content exclusion; attribution + exact revision recorded; no raw conversations
+  to paid models; internal evaluation only - no redistribution of derived sets.
+- Verdict: CodeChat passes desk-level checks as a CANDIDATE for a bounded evaluation
+  sample. Training use stays parked pending the license-scope question above.
