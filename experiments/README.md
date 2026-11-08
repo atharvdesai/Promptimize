@@ -13,6 +13,28 @@ trial").
   to guide modeling. Splits are frozen (seed 20261003, group-aware).
 - **Every trial gets one commit**: hypothesis, config, data/model
   revisions, and results - including failures. No empty churn.
+- **Val reuse across trials is selection exposure**: the loop re-reads
+  val once per trial to compare approaches, so val numbers are
+  DIRECTIONAL, not an independent final evaluation. A clean final claim
+  needs a fresh never-developed-against holdout; the test split (recorded
+  sanity exposure) is the last resort and still limits the claim.
+- **Probe governance**: `t2_probes.jsonl` is a DEVELOPMENT diagnostic -
+  its failures may guide remediation, so gains on it afterwards are
+  remediation evidence, not independent generalization. Each new
+  diagnostic family is authored AFTER the fix it evaluates, frozen
+  (SHA256 in trials.jsonl) before scoring, and kept separate from any
+  eventual independently sourced test set. Model-authored probes never
+  support a real-prompt generalization claim.
+- **Augmentation labels are inspected, not assumed**: counterfactual
+  surface augmentation may only inherit a label when the transformation
+  provably preserves discoverability (shortening must not remove needed
+  context; added paths must not make missing info discoverable). Every
+  augmented row carries a per-row rationale; sample both flagged and
+  unflagged cases for review. Augmentation touches train only - never
+  val, never probes.
+- **Preserve everything**: raw results, failed variants, prior model
+  configs and counts are kept (git or Drive archive); no result is
+  silently overwritten.
 - **Metrics with honest denominators**: accuracy, over-asking rate
   (false interrupts over executable rows), under-asking rate (missed
   ambiguity over ambiguous rows), Wilson 95% CIs on the actual n.
