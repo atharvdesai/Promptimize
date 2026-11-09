@@ -1,3 +1,5 @@
+import http.client
+import io
 import json
 import os
 import sys
@@ -5,6 +7,7 @@ import tempfile
 import threading
 import unittest
 import urllib.request
+from contextlib import redirect_stderr
 from http.server import ThreadingHTTPServer
 from unittest import mock
 
@@ -50,9 +53,12 @@ class ServeScoreTests(unittest.TestCase):
 class ServeHttpTests(unittest.TestCase):
     """HTTP surface: health, scoring, and clean errors."""
 
+    TOKEN = "test-token-0123456789"
+
     @classmethod
     def setUpClass(cls):
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), laya_serve.Handler)
+        cls.server.token = cls.TOKEN
         cls.port = cls.server.server_address[1]
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
         cls.thread.start()
@@ -62,11 +68,12 @@ class ServeHttpTests(unittest.TestCase):
         cls.server.shutdown()
         cls.server.server_close()
 
-    def post(self, path, obj):
+    def post(self, path, obj, token=None):
         body = json.dumps(obj).encode()
+        headers = {"Content-Type": "application/json"}
+        headers["X-Promptimize-Token"] = self.TOKEN if token is None else token
         req = urllib.request.Request(
-            "http://127.0.0.1:%d%s" % (self.port, path), data=body,
-            headers={"Content-Type": "application/json"})
+            "http://127.0.0.1:%d%s" % (self.port, path), data=body, headers=headers)
         try:
             with urllib.request.urlopen(req, timeout=5) as resp:
                 return resp.status, json.loads(resp.read())
@@ -74,8 +81,10 @@ class ServeHttpTests(unittest.TestCase):
             return e.code, json.loads(e.read())
 
     def test_healthz(self):
-        with urllib.request.urlopen(
-                "http://127.0.0.1:%d/healthz" % self.port, timeout=5) as resp:
+        req = urllib.request.Request(
+            "http://127.0.0.1:%d/healthz" % self.port,
+            headers={"X-Promptimize-Token": self.TOKEN})
+        with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read())
         self.assertTrue(data["ok"])
 
@@ -94,6 +103,77 @@ class ServeHttpTests(unittest.TestCase):
     def test_unknown_path_is_404(self):
         status, _ = self.post("/nope", {"prompt": "x"})
         self.assertEqual(status, 404)
+
+    def test_wrong_token_is_401(self):
+        status, _ = self.post("/score", {"prompt": "x"}, token="wrong")
+        self.assertEqual(status, 401)
+
+    def test_foreign_host_header_is_403(self):
+        # DNS-rebinding drive-by: a browser page pointed at 127.0.0.1
+        # carries its own Host. http.client lets us set it explicitly.
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        conn.request("POST", "/score", body=json.dumps({"prompt": "x"}),
+                     headers={"Content-Type": "application/json",
+                              "X-Promptimize-Token": self.TOKEN,
+                              "Host": "evil.example.com"})
+        resp = conn.getresponse()
+        resp.read()
+        conn.close()
+        self.assertEqual(resp.status, 403)
+
+    def test_concurrency_cap_returns_503(self):
+        slots = [laya_serve._inference_slots.acquire(blocking=False)
+                 for _ in range(laya_serve.MAX_CONCURRENT)]
+        try:
+            status, data = self.post("/score", {"prompt": "x"})
+            self.assertEqual(status, 503)
+        finally:
+            for _ in slots:
+                laya_serve._inference_slots.release()
+
+    def test_prompt_text_never_logged(self):
+        secret_prompt = "xyzzy-sentence-that-must-not-appear-in-logs"
+        buf = io.StringIO()
+        with redirect_stderr(buf):
+            with mock.patch.object(laya_serve, "score",
+                                   return_value={"p_can_execute": 0.5, "decider": "head",
+                                                 "p_ambiguous": 0.5, "latency_ms": 1}):
+                status, _ = self.post("/score", {"prompt": secret_prompt})
+        self.assertEqual(status, 200)
+        self.assertNotIn(secret_prompt, buf.getvalue())
+
+    def test_missing_server_token_config_refuses(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), laya_serve.Handler)
+        port = server.server_address[1]
+        t = threading.Thread(target=server.serve_forever, daemon=True)
+        t.start()
+        try:
+            conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+            conn.request("GET", "/healthz",
+                         headers={"X-Promptimize-Token": "anything"})
+            resp = conn.getresponse()
+            resp.read()
+            conn.close()
+            self.assertEqual(resp.status, 500)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+
+class TokenFileTests(unittest.TestCase):
+    def test_ensure_token_creates_0600_and_reuses(self):
+        d = tempfile.mkdtemp()
+        path = os.path.join(d, "serve_token")
+        with mock.patch.dict(os.environ, {"PROMPTIMIZE_SERVE_TOKEN_FILE": path}):
+            tok = laya_serve.ensure_token()
+            self.assertEqual(len(tok), 32)
+            self.assertEqual(oct(os.stat(path).st_mode & 0o777), "0o600")
+            self.assertEqual(laya_serve.ensure_token(), tok)  # reused
+
+    def test_load_token_missing_returns_none(self):
+        with mock.patch.dict(os.environ,
+                             {"PROMPTIMIZE_SERVE_TOKEN_FILE": "/nonexistent/tok"}):
+            self.assertIsNone(laya_serve._load_token())
 
 
 class HookServePathTests(unittest.TestCase):
@@ -157,6 +237,32 @@ class HookServePathTests(unittest.TestCase):
         with open(gate.USAGE_LOG) as f:
             entries = [json.loads(l) for l in f if '"decision"' in l]
         self.assertEqual(entries[0]["via"], "server")
+
+    def test_hook_sends_token_header_when_file_present(self):
+        tok_path = os.path.join(self.dir.name, "serve_token")
+        with open(tok_path, "w") as f:
+            f.write("abc123")
+        os.environ["PROMPTIMIZE_SERVE_TOKEN_FILE"] = tok_path
+        try:
+            captured = {}
+
+            class FakeResp:
+                def read(self):
+                    return json.dumps({"p_can_execute": 0.5}).encode()
+                def __enter__(self):
+                    return self
+                def __exit__(self, *a):
+                    return False
+
+            def fake_urlopen(req, timeout=None):
+                captured["headers"] = dict(req.header_items())
+                return FakeResp()
+
+            with mock.patch("urllib.request.urlopen", fake_urlopen):
+                gate._serve_score("prompt text here", "head")
+            self.assertEqual(captured["headers"].get("X-promptimize-token"), "abc123")
+        finally:
+            os.environ.pop("PROMPTIMIZE_SERVE_TOKEN_FILE", None)
 
 
 if __name__ == "__main__":
