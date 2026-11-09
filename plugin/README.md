@@ -103,9 +103,23 @@ stop-before-cap accounting, not an exact billing guarantee.
 
 `PROMPTIMIZE_MODE`:
 - `hybrid` (default): LAYA decides locally, Haiku writes the question on
-  flags. Note the hook is a fresh process per prompt, so LAYA's model
-  load (~4-7 s on first run, ~4 s warm) is paid on every prompt; a
-  resident `laya-serve` daemon is the follow-up if that feels slow.
+  flags. The hook is a fresh process per prompt; run the companion
+  decision server so the model stays warm (measured on a constrained
+  Linux sandbox: 0.6 s warm vs 7.9 s in-process cold; ratio is the
+  point, absolute numbers are hardware-dependent):
+
+  ```bash
+  PROMPTIMIZE_LAYA_ONNX=/path/to/model.onnx \
+    nohup python3 /path/to/Promptimize/plugin/laya_serve.py \
+    > ~/.promptimize/serve.log 2>&1 &
+  ```
+
+  The hook tries the server first (`PROMPTIMIZE_SERVE_URL`, default
+  `http://127.0.0.1:8735`) and falls back to the in-process load on any
+  error - the server is an accelerator, never a requirement. The
+  decision log's `via` field says which path answered. The server binds
+  127.0.0.1 only; prompts stay on the machine exactly as in-process.
+  `PROMPTIMIZE_SERVE=0` skips it.
 - `haiku`: Haiku makes the decision AND writes the question (~1 s, one
   API call per prompt, needs network; prompts leave the machine on every
   prompt, not only flagged ones). This is the comparison arm from the
