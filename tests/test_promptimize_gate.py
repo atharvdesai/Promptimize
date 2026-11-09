@@ -32,10 +32,12 @@ class GateHookTests(unittest.TestCase):
         # The legacy hook tests below were written against the noul decider's
         # 0.35 posture; pin it. Head-decider tests set their own env.
         os.environ["PROMPTIMIZE_DECIDER"] = "noul"
+        os.environ["PROMPTIMIZE_SERVE"] = "0"  # pin the in-process path
 
     def tearDown(self):
         gate.USAGE_LOG = self._old_log
         os.environ.pop("PROMPTIMIZE_DECIDER", None)
+        os.environ.pop("PROMPTIMIZE_SERVE", None)
         self.dir.cleanup()
 
     def run_hook(self, prompt, prob):
@@ -144,11 +146,12 @@ class DeciderTests(unittest.TestCase):
         for var in ("PROMPTIMIZE_DISABLED", "PROMPTIMIZE_THRESHOLD",
                     "PROMPTIMIZE_DECIDER", "PROMPTIMIZE_GATE_HEAD"):
             os.environ.pop(var, None)
+        os.environ["PROMPTIMIZE_SERVE"] = "0"  # pin the in-process path
 
     def tearDown(self):
         gate.USAGE_LOG = self._old_log
         gate._head, gate._head_path = self._old_head, self._old_head_path
-        for var in ("PROMPTIMIZE_DECIDER", "PROMPTIMIZE_GATE_HEAD"):
+        for var in ("PROMPTIMIZE_DECIDER", "PROMPTIMIZE_GATE_HEAD", "PROMPTIMIZE_SERVE"):
             os.environ.pop(var, None)
         self.dir.cleanup()
 
