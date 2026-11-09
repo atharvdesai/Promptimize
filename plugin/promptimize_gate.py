@@ -29,6 +29,16 @@ Config (env):
   PROMPTIMIZE_ANTHROPIC_KEY_FILE  file containing the Anthropic API key
   PROMPTIMIZE_BUDGET_USD      total spend cap, fail closed (default 2.00)
   PROMPTIMIZE_DISABLED        set to 1 to bypass the gate entirely
+  PROMPTIMIZE_SERVE           set to 0/off to skip the resident decision
+                              server and always score in-process
+  PROMPTIMIZE_SERVE_URL       server base URL (default http://127.0.0.1:8735,
+                              see plugin/laya_serve.py)
+
+Latency: the hook is a fresh process per prompt. When plugin/laya_serve.py
+is running, decide() asks it first (one warm model, ~0.3 s) and falls
+back to the in-process load (~4-7 s) on any error - the server is an
+accelerator, never a requirement. The decision log's "via" field says
+which path answered ("server" or "local").
 
 Deciders. "noul" is LAYA's zero-shot head with the instructions below:
 measured val acc 0.682, over-asking 0.238 / under-asking 0.348 at 0.35
@@ -74,10 +84,12 @@ NOUL_INSTRUCTIONS = (
 )
 MIN_PROMPT_CHARS = 25
 HEAD_PATH_DEFAULT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gate_head.json")
+SERVE_URL_DEFAULT = "http://127.0.0.1:8735"
 
 _agent = None
 _head = None
 _head_path = None
+_last_via = None  # "server" | "local" - set by decide(), read by run() for the decision log
 
 
 def _log(kind, **fields):
@@ -138,9 +150,37 @@ def _load_agent():
     return _agent
 
 
+def _serve_score(prompt, decider):
+    """Score via the resident laya_serve daemon; None when unavailable,
+    so the caller falls back to the in-process path. The server holds
+    the same artifact and normalization contract - identical scores,
+    just without the per-prompt model load."""
+    if os.environ.get("PROMPTIMIZE_SERVE", "1").lower() in ("0", "off", "false"):
+        return None
+    import urllib.request
+
+    url = os.environ.get("PROMPTIMIZE_SERVE_URL", SERVE_URL_DEFAULT).rstrip("/") + "/score"
+    body = json.dumps({"prompt": prompt, "decider": decider}).encode()
+    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read())
+        return float(data["p_can_execute"])
+    except Exception:
+        return None
+
+
 def decide(prompt):
-    """P(can_execute). Dispatches to the selected decider. Raises on failure."""
-    if decider_name() == "head":
+    """P(can_execute). Server first when reachable, else in-process.
+    Dispatches to the selected decider. Raises on failure."""
+    global _last_via
+    decider = decider_name()
+    served = _serve_score(prompt, decider)
+    if served is not None:
+        _last_via = "server"
+        return served
+    _last_via = "local"
+    if decider == "head":
         return 1.0 - score_head(embed_prompt(prompt), load_head())
     return decide_noul(prompt)
 
@@ -256,7 +296,7 @@ def run(stdin_text):
     else:
         prob = decide(prompt)
         decision_ms = int((time.time() - t0) * 1000)
-        _log("decision", mode=mode, decider=decider, prob=round(prob, 4),
+        _log("decision", mode=mode, decider=decider, via=_last_via, prob=round(prob, 4),
              threshold=threshold, latency_ms=decision_ms,
              blind_spot=in_measured_blind_spot(prompt))
         # Head: ask when P(can_execute) <= 0.95, EXACTLY equivalent to the
