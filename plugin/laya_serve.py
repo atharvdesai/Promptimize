@@ -15,9 +15,14 @@ Run (macOS dogfooding):
       nohup python3 /path/to/Promptimize/plugin/laya_serve.py \
       > ~/.promptimize/serve.log 2>&1 &
 
-Binds 127.0.0.1 only. Prompt text stays on the machine exactly as with
-the in-process path; the server logs nothing but request counts and
-latencies to stderr.
+Binds 127.0.0.1 only - and loopback alone is NOT treated as
+sufficient: every request must carry a localhost Host header (blocks
+DNS-rebinding drive-bys from web pages) and the shared token from
+~/.promptimize/serve_token (0600, auto-created on first run; blocks
+other local processes). The hook sends the token automatically.
+Concurrency is bounded (4 inferences, 503 beyond) and bodies are
+capped at 1 MB. Prompt text is never logged; stderr carries request
+lines only.
 
 Endpoints:
   GET  /healthz -> {"ok": true, "deciders": [...]}
@@ -29,11 +34,15 @@ Config (env):
   PROMPTIMIZE_LAYA_ONNX    path to model.onnx (default: plugin/model.onnx)
   PROMPTIMIZE_SERVE_PORT   bind port (default 8735)
   PROMPTIMIZE_GATE_HEAD    path to gate_head.json (default: plugin/)
+  PROMPTIMIZE_SERVE_TOKEN_FILE  token path (default ~/.promptimize/serve_token)
 """
 
+import hmac
 import json
 import os
+import secrets
 import sys
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -43,6 +52,35 @@ sys.path.insert(0, HERE)
 import promptimize_gate as gate
 
 DEFAULT_PORT = 8735
+MAX_CONCURRENT = 4  # inferences at once; the hook sends one per prompt
+TOKEN_PATH_DEFAULT = os.path.expanduser("~/.promptimize/serve_token")
+_ALLOWED_HOSTS = ("127.0.0.1", "localhost", "::1")
+_inference_slots = threading.BoundedSemaphore(MAX_CONCURRENT)
+
+
+def _token_path():
+    return os.environ.get("PROMPTIMIZE_SERVE_TOKEN_FILE", TOKEN_PATH_DEFAULT)
+
+
+def _load_token():
+    try:
+        with open(_token_path()) as f:
+            return f.read().strip() or None
+    except OSError:
+        return None
+
+
+def ensure_token():
+    """The shared localhost token, created 0600 on first use."""
+    tok = _load_token()
+    if tok:
+        return tok
+    os.makedirs(os.path.dirname(_token_path()), exist_ok=True)
+    tok = secrets.token_hex(16)
+    fd = os.open(_token_path(), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(tok)
+    return tok
 
 
 def score(prompt, decider):
@@ -75,15 +113,41 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _prelude(self):
+        """Host-header check (blocks DNS-rebinding drive-bys from
+        browsers) + shared-token check (blocks other local processes).
+        Loopback alone is NOT treated as sufficient. Returns True when
+        the request may proceed."""
+        host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]")
+        if host not in _ALLOWED_HOSTS:
+            self._send(403, {"error": "forbidden host"})
+            return False
+        expected = getattr(self.server, "token", None)
+        if expected is None:  # embedded without a token: refuse, never open
+            self._send(500, {"error": "server token not configured"})
+            return False
+        got = self.headers.get("X-Promptimize-Token", "")
+        if not hmac.compare_digest(got, expected):
+            self._send(401, {"error": "unauthorized"})
+            return False
+        return True
+
     def do_GET(self):
+        if not self._prelude():
+            return
         if self.path == "/healthz":
             self._send(200, {"ok": True, "deciders": ["head", "noul"]})
         else:
             self._send(404, {"error": "not found"})
 
     def do_POST(self):
+        if not self._prelude():
+            return
         if self.path != "/score":
             self._send(404, {"error": "not found"})
+            return
+        if not _inference_slots.acquire(blocking=False):
+            self._send(503, {"error": "busy"})
             return
         try:
             length = int(self.headers.get("Content-Length") or 0)
@@ -101,6 +165,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(400, {"error": str(e)})
         except Exception as e:  # fail closed toward the hook's local path
             self._send(500, {"error": type(e).__name__})
+        finally:
+            _inference_slots.release()
 
 
 def main():
@@ -112,7 +178,8 @@ def main():
     except Exception:
         pass  # noul-only deployments have no artifact; head requests will 500
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    sys.stderr.write("promptimize-serve listening on 127.0.0.1:%d\n" % port)
+    server.token = ensure_token()
+    sys.stderr.write("promptimize-serve listening on 127.0.0.1:%d (token auth on)\n" % port)
     server.serve_forever()
 
 
