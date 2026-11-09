@@ -36,11 +36,13 @@ class HookDefaultPathTests(unittest.TestCase):
         for var in ("PROMPTIMIZE_DISABLED", "PROMPTIMIZE_THRESHOLD",
                     "PROMPTIMIZE_DECIDER", "PROMPTIMIZE_GATE_HEAD"):
             os.environ.pop(var, None)
+        os.environ["PROMPTIMIZE_SERVE"] = "0"  # pin the in-process path
         self.head = gate.load_head()  # the real shipped artifact
 
     def tearDown(self):
         gate.USAGE_LOG = self._old_log
         gate._head, gate._head_path = self._old_head, self._old_head_path
+        os.environ.pop("PROMPTIMIZE_SERVE", None)
         self.dir.cleanup()
 
     def craft_emb(self, p_amb_target):
