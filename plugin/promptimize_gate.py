@@ -150,6 +150,19 @@ def _load_agent():
     return _agent
 
 
+def _serve_token():
+    """Shared localhost token for the decision server (0600 file created
+    by laya_serve; unreadable/missing -> no header -> 401 -> fallback)."""
+    path = os.environ.get(
+        "PROMPTIMIZE_SERVE_TOKEN_FILE",
+        os.path.expanduser("~/.promptimize/serve_token"))
+    try:
+        with open(path) as f:
+            return f.read().strip() or None
+    except OSError:
+        return None
+
+
 def _serve_score(prompt, decider):
     """Score via the resident laya_serve daemon; None when unavailable,
     so the caller falls back to the in-process path. The server holds
@@ -161,7 +174,11 @@ def _serve_score(prompt, decider):
 
     url = os.environ.get("PROMPTIMIZE_SERVE_URL", SERVE_URL_DEFAULT).rstrip("/") + "/score"
     body = json.dumps({"prompt": prompt, "decider": decider}).encode()
-    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
+    headers = {"Content-Type": "application/json"}
+    tok = _serve_token()
+    if tok:
+        headers["X-Promptimize-Token"] = tok
+    req = urllib.request.Request(url, data=body, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read())
