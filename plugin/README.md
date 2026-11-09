@@ -117,9 +117,21 @@ stop-before-cap accounting, not an exact billing guarantee.
   The hook tries the server first (`PROMPTIMIZE_SERVE_URL`, default
   `http://127.0.0.1:8735`) and falls back to the in-process load on any
   error - the server is an accelerator, never a requirement. The
-  decision log's `via` field says which path answered. The server binds
-  127.0.0.1 only; prompts stay on the machine exactly as in-process.
+  decision log's `via` field says which path answered.
   `PROMPTIMIZE_SERVE=0` skips it.
+
+  Server security posture (loopback alone is not the claim):
+  - Binds 127.0.0.1 only - no LAN exposure by default.
+  - Every request needs a shared token (`~/.promptimize/serve_token`,
+    created 0600 on first run, sent automatically by the hook) -
+    other local processes can't score prompts through it.
+  - The Host header must be 127.0.0.1/localhost/[::1] - blocks
+    DNS-rebinding drive-bys from web pages (403 otherwise).
+  - Concurrency is capped at 4 inferences (503 beyond), request
+    bodies at 1 MB, prompts at 100 KB.
+  - Prompt text is never logged; stderr carries request lines only.
+  Remaining caveat: token auth is plaintext over loopback (no TLS) -
+  fine for a single-user machine, don't expose the port beyond it.
 - `haiku`: Haiku makes the decision AND writes the question (~1 s, one
   API call per prompt, needs network; prompts leave the machine on every
   prompt, not only flagged ones). This is the comparison arm from the
