@@ -1,0 +1,149 @@
+{
+ "trial": "T6",
+ "what": "Threshold-policy sweep for the long-ambiguous blind spot, scored through the SHIPPED plugin/gate_head.json artifact on probe families 1+2",
+ "artifact_val": {
+  "acc": 0.977,
+  "over": 0.048,
+  "under": 0.0,
+  "n": 44,
+  "thr": 0.05
+ },
+ "long_ambiguous_n": 13,
+ "long_executable_n": 13,
+ "long_ambiguous_scores": {
+  "F1:C1": 0.0,
+  "F1:C2": 0.0119,
+  "F1:C3": 0.0,
+  "F1:C4": 0.0,
+  "F1:C5": 0.0001,
+  "F2:A1": 0.0,
+  "F2:A2": 0.0,
+  "F2:A3": 0.0,
+  "F2:A4": 0.0,
+  "F2:A5": 0.0,
+  "F2:A6": 0.0149,
+  "F2:A7": 0.0,
+  "F2:A8": 0.0
+ },
+ "long_executable_scores_max": 0.0008,
+ "deep_miss_ids_p_below_1e-4": [
+  "F1:C1",
+  "F1:C3",
+  "F1:C4",
+  "F2:A1",
+  "F2:A2",
+  "F2:A3",
+  "F2:A4",
+  "F2:A5",
+  "F2:A7",
+  "F2:A8"
+ ],
+ "amb_z_sorted": [
+  -17.03,
+  -14.67,
+  -14.65,
+  -13.05,
+  -12.62,
+  -12.14,
+  -11.5,
+  -11.44,
+  -11.31,
+  -11.22,
+  -9.08,
+  -4.42,
+  -4.19
+ ],
+ "exec_z_sorted": [
+  -24.72,
+  -24.23,
+  -21.76,
+  -19.53,
+  -17.32,
+  -16.66,
+  -13.63,
+  -12.91,
+  -12.79,
+  -12.17,
+  -11.84,
+  -8.55,
+  -7.17
+ ],
+ "threshold_sweep": {
+  "0.05": {
+   "amb_recalled": "0/13",
+   "caught_ids": [],
+   "false_asks_on_long_exec": []
+  },
+  "0.01": {
+   "amb_recalled": "2/13",
+   "caught_ids": [
+    "F1:C2",
+    "F2:A6"
+   ],
+   "false_asks_on_long_exec": []
+  },
+  "0.001": {
+   "amb_recalled": "2/13",
+   "caught_ids": [
+    "F1:C2",
+    "F2:A6"
+   ],
+   "false_asks_on_long_exec": []
+  },
+  "0.0001": {
+   "amb_recalled": "3/13",
+   "caught_ids": [
+    "F1:C2",
+    "F1:C5",
+    "F2:A6"
+   ],
+   "false_asks_on_long_exec": [
+    "F1:A4",
+    "F1:A5"
+   ]
+  },
+  "1e-05": {
+   "amb_recalled": "7/13",
+   "caught_ids": [
+    "F1:C2",
+    "F1:C3",
+    "F1:C4",
+    "F1:C5",
+    "F2:A6",
+    "F2:A7",
+    "F2:A8"
+   ],
+   "false_asks_on_long_exec": [
+    "F1:A4",
+    "F1:A5"
+   ]
+  },
+  "1e-06": {
+   "amb_recalled": "10/13",
+   "caught_ids": [
+    "F1:C2",
+    "F1:C3",
+    "F1:C4",
+    "F1:C5",
+    "F2:A1",
+    "F2:A2",
+    "F2:A3",
+    "F2:A6",
+    "F2:A7",
+    "F2:A8"
+   ],
+   "false_asks_on_long_exec": [
+    "F1:A1",
+    "F1:A2",
+    "F1:A3",
+    "F1:A4",
+    "F1:A5",
+    "F2:E3",
+    "F2:E6"
+   ]
+  }
+ },
+ "verdict": "No threshold policy recovers the blind spot: the score distributions overlap almost completely (long-ambiguous z in [-17.03, -4.19], long-executable z in [-24.72, -7.17]). At operational thresholds (>= 0.001) recall is 2/13 with zero false-asks; at 1e-5 recall is only 7/13 with 2/13 long-executable false-asks; at 1e-6 recall is 10/13 but false-asks 7/13. 10/13 long-ambiguous probes are deep-confidence misses (p < 1e-4). Mitigation must be upstream (training data / retraining), not a policy tweak on this head. The hook's blind_spot:true log flag stays heuristic-only.",
+ "reproducibility_note": "Fresh machine + fresh deps (laya 0.4.30, onnxruntime 1.23.2) reproduce committed T5 val and every committed P2 per-probe score exactly; laya 0.4.26-0.4.30 embeddings are cos=1.0 identical.",
+ "ts": 1794336668.4755144
+}
