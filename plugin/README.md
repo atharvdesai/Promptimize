@@ -35,6 +35,20 @@ Add to `~/.claude/settings.json`:
 }
 ```
 
+**Verify the install (run this before trusting the hook):**
+
+```bash
+python3 plugin/promptimize_doctor.py
+```
+
+The doctor runs 12 checks (python, deps, model file, head artifact,
+normalization contract, decider resolution, a scoring smoke test against
+two frozen probes with committed expected scores, API key, budget
+ledger, usage log, decision server, Claude Code wiring) and prints an
+actionable fix for anything that FAILs. Exit code 0 means the gate is
+scoring as configured; WARN entries (no key, no server) are degraded
+but working states.
+
 **API key (never paste it into chat, settings.json, or the repo):**
 
 Preferred, macOS Keychain - run this once (it prompts nothing; replace
