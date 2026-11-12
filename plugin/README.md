@@ -111,6 +111,10 @@ stop-before-cap accounting, not an exact billing guarantee.
   estimated cost, latency. **No prompt text is logged.** Your prompt
   leaves the machine only inside the question-drafting call, only when
   flagged.
+- Read the telemetry back with `python3 scripts/summarize_usage.py` -
+  decision volume, ask rate, server/fallback split, latency, blind-spot
+  share, question pipeline, estimated cost, per-day trend. It also
+  self-checks that no entry contains prompt text.
 - `PROMPTIMIZE_DISABLED=1` bypasses the gate entirely.
 
 ## Modes and latency
