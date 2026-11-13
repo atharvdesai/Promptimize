@@ -1,0 +1,274 @@
+{
+ "trial": "T3",
+ "what": "frozen-embedding logistic head retrained on train+40 counterfactual surface augmentations (debias attempt)",
+ "selected_config": {
+  "lr": 0.1,
+  "l2": 0.0001,
+  "thr": 0.05
+ },
+ "train": {
+  "acc": 1.0,
+  "over": 0.0,
+  "under": 0.0,
+  "n": 372,
+  "thr": 0.05
+ },
+ "val": {
+  "acc": 0.932,
+  "over": 0.143,
+  "under": 0.0,
+  "n": 44,
+  "thr": 0.05
+ },
+ "val_acc_wilson95": [
+  0.818,
+  0.977
+ ],
+ "all_train_configs": {
+  "lr0.1_l20.0001": {
+   "best_thr": 0.05,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0,
+   "train_n": 372,
+   "train_thr": 0.05
+  },
+  "lr0.1_l20.001": {
+   "best_thr": 0.05,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0,
+   "train_n": 372,
+   "train_thr": 0.05
+  },
+  "lr0.1_l20.01": {
+   "best_thr": 0.15,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0,
+   "train_n": 372,
+   "train_thr": 0.15000000000000002
+  },
+  "lr0.3_l20.0001": {
+   "best_thr": 0.05,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0,
+   "train_n": 372,
+   "train_thr": 0.05
+  },
+  "lr0.3_l20.001": {
+   "best_thr": 0.05,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0,
+   "train_n": 372,
+   "train_thr": 0.05
+  },
+  "lr0.3_l20.01": {
+   "best_thr": 0.15,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0,
+   "train_n": 372,
+   "train_thr": 0.15000000000000002
+  },
+  "lr0.5_l20.0001": {
+   "best_thr": 0.05,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0,
+   "train_n": 372,
+   "train_thr": 0.05
+  },
+  "lr0.5_l20.001": {
+   "best_thr": 0.05,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0,
+   "train_n": 372,
+   "train_thr": 0.05
+  },
+  "lr0.5_l20.01": {
+   "best_thr": 0.15,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0,
+   "train_n": 372,
+   "train_thr": 0.15000000000000002
+  }
+ },
+ "dev_probes": {
+  "overall": {
+   "acc": 0.6,
+   "n": 20
+  },
+  "by_cell": {
+   "amb_longpath": {
+    "acc": 0.0,
+    "n": 5
+   },
+   "amb_short": {
+    "acc": 1.0,
+    "n": 5
+   },
+   "exec_longpath": {
+    "acc": 0.8,
+    "n": 5
+   },
+   "exec_short": {
+    "acc": 0.6,
+    "n": 5
+   }
+  },
+  "per_probe": [
+   {
+    "id": "A1",
+    "cell": "exec_longpath",
+    "p_ambiguous": 0.1471,
+    "ask": true,
+    "correct": false
+   },
+   {
+    "id": "A2",
+    "cell": "exec_longpath",
+    "p_ambiguous": 0.0002,
+    "ask": false,
+    "correct": true
+   },
+   {
+    "id": "A3",
+    "cell": "exec_longpath",
+    "p_ambiguous": 0.0,
+    "ask": false,
+    "correct": true
+   },
+   {
+    "id": "A4",
+    "cell": "exec_longpath",
+    "p_ambiguous": 0.0359,
+    "ask": false,
+    "correct": true
+   },
+   {
+    "id": "A5",
+    "cell": "exec_longpath",
+    "p_ambiguous": 0.035,
+    "ask": false,
+    "correct": true
+   },
+   {
+    "id": "B1",
+    "cell": "exec_short",
+    "p_ambiguous": 0.0125,
+    "ask": false,
+    "correct": true
+   },
+   {
+    "id": "B2",
+    "cell": "exec_short",
+    "p_ambiguous": 0.1105,
+    "ask": true,
+    "correct": false
+   },
+   {
+    "id": "B3",
+    "cell": "exec_short",
+    "p_ambiguous": 0.0214,
+    "ask": false,
+    "correct": true
+   },
+   {
+    "id": "B4",
+    "cell": "exec_short",
+    "p_ambiguous": 0.1117,
+    "ask": true,
+    "correct": false
+   },
+   {
+    "id": "B5",
+    "cell": "exec_short",
+    "p_ambiguous": 0.0174,
+    "ask": false,
+    "correct": true
+   },
+   {
+    "id": "C1",
+    "cell": "amb_longpath",
+    "p_ambiguous": 0.0,
+    "ask": false,
+    "correct": false
+   },
+   {
+    "id": "C2",
+    "cell": "amb_longpath",
+    "p_ambiguous": 0.0006,
+    "ask": false,
+    "correct": false
+   },
+   {
+    "id": "C3",
+    "cell": "amb_longpath",
+    "p_ambiguous": 0.0,
+    "ask": false,
+    "correct": false
+   },
+   {
+    "id": "C4",
+    "cell": "amb_longpath",
+    "p_ambiguous": 0.0008,
+    "ask": false,
+    "correct": false
+   },
+   {
+    "id": "C5",
+    "cell": "amb_longpath",
+    "p_ambiguous": 0.0021,
+    "ask": false,
+    "correct": false
+   },
+   {
+    "id": "D1",
+    "cell": "amb_short",
+    "p_ambiguous": 1.0,
+    "ask": true,
+    "correct": true
+   },
+   {
+    "id": "D2",
+    "cell": "amb_short",
+    "p_ambiguous": 0.9999,
+    "ask": true,
+    "correct": true
+   },
+   {
+    "id": "D3",
+    "cell": "amb_short",
+    "p_ambiguous": 0.9998,
+    "ask": true,
+    "correct": true
+   },
+   {
+    "id": "D4",
+    "cell": "amb_short",
+    "p_ambiguous": 1.0,
+    "ask": true,
+    "correct": true
+   },
+   {
+    "id": "D5",
+    "cell": "amb_short",
+    "p_ambiguous": 0.9994,
+    "ask": true,
+    "correct": true
+   }
+  ],
+  "status": "DEVELOPMENT diagnostics - remediation evidence only, not independent generalization"
+ },
+ "caveats": [
+  "Augmented rows are model-authored with labels by construction; they debias the training signal, they are not real-prompt evidence.",
+  "Val reused across trials - directional. Probe gains after seeing probe failures = remediation evidence per probe governance.",
+  "40/372 rows augmented (11%) - a partial correction; residual shortcut likely."
+ ],
+ "ts": 1794111979.5733266
+}

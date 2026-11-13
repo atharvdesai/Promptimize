@@ -1,0 +1,299 @@
+{
+ "trial": "P2",
+ "what": "diagnostic probe family 2 (post-T5, 24 probes, 12 matched counterfactual pairs incl. long-no-path cells) scored through the frozen T5 pipeline",
+ "frozen_sha256": "594f3c560c047474fd35fe8d4de10cbbbb19ccc11ff78835477175fc5002059d",
+ "pipeline": "T5 normalize + LAYA ONNX embedding + logistic head (T5 selected config, retrained on normalized train)",
+ "t5_config": {
+  "lr": 0.1,
+  "l2": 0.0001,
+  "thr": 0.05
+ },
+ "overall": {
+  "acc": 0.625,
+  "n": 24
+ },
+ "by_cell": {
+  "amb_long_nopath": {
+   "acc": 0.0,
+   "n": 4
+  },
+  "amb_longpath_v2": {
+   "acc": 0.0,
+   "n": 4
+  },
+  "amb_short_v2": {
+   "acc": 0.75,
+   "n": 4
+  },
+  "exec_long_nopath": {
+   "acc": 1.0,
+   "n": 4
+  },
+  "exec_longpath_v2": {
+   "acc": 1.0,
+   "n": 4
+  },
+  "exec_short_v2": {
+   "acc": 1.0,
+   "n": 4
+  }
+ },
+ "pair_contrast": {
+  "p1": {
+   "exec_p": 0.0,
+   "amb_p": 0.0,
+   "separated": false
+  },
+  "p10": {
+   "exec_p": 0.0055,
+   "amb_p": 0.9262,
+   "separated": true
+  },
+  "p11": {
+   "exec_p": 0.0,
+   "amb_p": 0.0007,
+   "separated": false
+  },
+  "p12": {
+   "exec_p": 0.013,
+   "amb_p": 0.0567,
+   "separated": true
+  },
+  "p2": {
+   "exec_p": 0.0,
+   "amb_p": 0.0,
+   "separated": false
+  },
+  "p3": {
+   "exec_p": 0.0,
+   "amb_p": 0.0,
+   "separated": false
+  },
+  "p4": {
+   "exec_p": 0.0,
+   "amb_p": 0.0,
+   "separated": false
+  },
+  "p5": {
+   "exec_p": 0.0,
+   "amb_p": 0.0,
+   "separated": false
+  },
+  "p6": {
+   "exec_p": 0.0,
+   "amb_p": 0.0149,
+   "separated": false
+  },
+  "p7": {
+   "exec_p": 0.0,
+   "amb_p": 0.0,
+   "separated": false
+  },
+  "p8": {
+   "exec_p": 0.0,
+   "amb_p": 0.0,
+   "separated": false
+  },
+  "p9": {
+   "exec_p": 0.0,
+   "amb_p": 0.3322,
+   "separated": true
+  }
+ },
+ "per_probe": [
+  {
+   "id": "A1",
+   "cell": "amb_longpath_v2",
+   "pair": "p1",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "correct": false
+  },
+  {
+   "id": "A10",
+   "cell": "amb_short_v2",
+   "pair": "p10",
+   "p_ambiguous": 0.9262,
+   "ask": true,
+   "correct": true
+  },
+  {
+   "id": "A11",
+   "cell": "amb_short_v2",
+   "pair": "p11",
+   "p_ambiguous": 0.0007,
+   "ask": false,
+   "correct": false
+  },
+  {
+   "id": "A12",
+   "cell": "amb_short_v2",
+   "pair": "p12",
+   "p_ambiguous": 0.0567,
+   "ask": true,
+   "correct": true
+  },
+  {
+   "id": "A2",
+   "cell": "amb_longpath_v2",
+   "pair": "p2",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "correct": false
+  },
+  {
+   "id": "A3",
+   "cell": "amb_longpath_v2",
+   "pair": "p3",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "correct": false
+  },
+  {
+   "id": "A4",
+   "cell": "amb_longpath_v2",
+   "pair": "p4",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "correct": false
+  },
+  {
+   "id": "A5",
+   "cell": "amb_long_nopath",
+   "pair": "p5",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "correct": false
+  },
+  {
+   "id": "A6",
+   "cell": "amb_long_nopath",
+   "pair": "p6",
+   "p_ambiguous": 0.0149,
+   "ask": false,
+   "correct": false
+  },
+  {
+   "id": "A7",
+   "cell": "amb_long_nopath",
+   "pair": "p7",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "correct": false
+  },
+  {
+   "id": "A8",
+   "cell": "amb_long_nopath",
+   "pair": "p8",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "correct": false
+  },
+  {
+   "id": "A9",
+   "cell": "amb_short_v2",
+   "pair": "p9",
+   "p_ambiguous": 0.3322,
+   "ask": true,
+   "correct": true
+  },
+  {
+   "id": "E1",
+   "cell": "exec_longpath_v2",
+   "pair": "p1",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "correct": true
+  },
+  {
+   "id": "E10",
+   "cell": "exec_short_v2",
+   "pair": "p10",
+   "p_ambiguous": 0.0055,
+   "ask": false,
+   "correct": true
+  },
+  {
+   "id": "E11",
+   "cell": "exec_short_v2",
+   "pair": "p11",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "correct": true
+  },
+  {
+   "id": "E12",
+   "cell": "exec_short_v2",
+   "pair": "p12",
+   "p_ambiguous": 0.013,
+   "ask": false,
+   "correct": true
+  },
+  {
+   "id": "E2",
+   "cell": "exec_longpath_v2",
+   "pair": "p2",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "correct": true
+  },
+  {
+   "id": "E3",
+   "cell": "exec_longpath_v2",
+   "pair": "p3",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "correct": true
+  },
+  {
+   "id": "E4",
+   "cell": "exec_longpath_v2",
+   "pair": "p4",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "correct": true
+  },
+  {
+   "id": "E5",
+   "cell": "exec_long_nopath",
+   "pair": "p5",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "correct": true
+  },
+  {
+   "id": "E6",
+   "cell": "exec_long_nopath",
+   "pair": "p6",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "correct": true
+  },
+  {
+   "id": "E7",
+   "cell": "exec_long_nopath",
+   "pair": "p7",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "correct": true
+  },
+  {
+   "id": "E8",
+   "cell": "exec_long_nopath",
+   "pair": "p8",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "correct": true
+  },
+  {
+   "id": "E9",
+   "cell": "exec_short_v2",
+   "pair": "p9",
+   "p_ambiguous": 0.0,
+   "ask": false,
+   "correct": true
+  }
+ ],
+ "status": "DEVELOPMENT diagnostics - remediation evidence only, not an independent holdout; same-author synthetic probes",
+ "ts": 1794122923.1846693
+}

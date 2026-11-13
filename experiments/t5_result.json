@@ -1,0 +1,274 @@
+{
+ "trial": "T5",
+ "what": "input normalization (strip path-like tokens) before embedding; T2-style head retrained on normalized train",
+ "selected_config": {
+  "lr": 0.1,
+  "l2": 0.0001,
+  "thr": 0.05
+ },
+ "train": {
+  "acc": 1.0,
+  "over": 0.0,
+  "under": 0.0,
+  "n": 332,
+  "thr": 0.05
+ },
+ "val": {
+  "acc": 0.977,
+  "over": 0.048,
+  "under": 0.0,
+  "n": 44,
+  "thr": 0.05
+ },
+ "val_acc_wilson95": [
+  0.882,
+  0.996
+ ],
+ "all_train_configs": {
+  "lr0.1_l20.0001": {
+   "best_thr": 0.05,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0,
+   "train_n": 332,
+   "train_thr": 0.05
+  },
+  "lr0.1_l20.001": {
+   "best_thr": 0.05,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0,
+   "train_n": 332,
+   "train_thr": 0.05
+  },
+  "lr0.1_l20.01": {
+   "best_thr": 0.1,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0,
+   "train_n": 332,
+   "train_thr": 0.1
+  },
+  "lr0.3_l20.0001": {
+   "best_thr": 0.05,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0,
+   "train_n": 332,
+   "train_thr": 0.05
+  },
+  "lr0.3_l20.001": {
+   "best_thr": 0.05,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0,
+   "train_n": 332,
+   "train_thr": 0.05
+  },
+  "lr0.3_l20.01": {
+   "best_thr": 0.1,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0,
+   "train_n": 332,
+   "train_thr": 0.1
+  },
+  "lr0.5_l20.0001": {
+   "best_thr": 0.05,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0,
+   "train_n": 332,
+   "train_thr": 0.05
+  },
+  "lr0.5_l20.001": {
+   "best_thr": 0.05,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0,
+   "train_n": 332,
+   "train_thr": 0.05
+  },
+  "lr0.5_l20.01": {
+   "best_thr": 0.1,
+   "train_acc": 1.0,
+   "train_over": 0.0,
+   "train_under": 0.0,
+   "train_n": 332,
+   "train_thr": 0.1
+  }
+ },
+ "dev_probes": {
+  "overall": {
+   "acc": 0.7,
+   "n": 20
+  },
+  "by_cell": {
+   "amb_longpath": {
+    "acc": 0.0,
+    "n": 5
+   },
+   "amb_short": {
+    "acc": 1.0,
+    "n": 5
+   },
+   "exec_longpath": {
+    "acc": 1.0,
+    "n": 5
+   },
+   "exec_short": {
+    "acc": 0.8,
+    "n": 5
+   }
+  },
+  "per_probe": [
+   {
+    "id": "A1",
+    "cell": "exec_longpath",
+    "p_ambiguous": 0.0,
+    "ask": false,
+    "correct": true
+   },
+   {
+    "id": "A2",
+    "cell": "exec_longpath",
+    "p_ambiguous": 0.0,
+    "ask": false,
+    "correct": true
+   },
+   {
+    "id": "A3",
+    "cell": "exec_longpath",
+    "p_ambiguous": 0.0,
+    "ask": false,
+    "correct": true
+   },
+   {
+    "id": "A4",
+    "cell": "exec_longpath",
+    "p_ambiguous": 0.0008,
+    "ask": false,
+    "correct": true
+   },
+   {
+    "id": "A5",
+    "cell": "exec_longpath",
+    "p_ambiguous": 0.0002,
+    "ask": false,
+    "correct": true
+   },
+   {
+    "id": "B1",
+    "cell": "exec_short",
+    "p_ambiguous": 0.0166,
+    "ask": false,
+    "correct": true
+   },
+   {
+    "id": "B2",
+    "cell": "exec_short",
+    "p_ambiguous": 0.0271,
+    "ask": false,
+    "correct": true
+   },
+   {
+    "id": "B3",
+    "cell": "exec_short",
+    "p_ambiguous": 0.0265,
+    "ask": false,
+    "correct": true
+   },
+   {
+    "id": "B4",
+    "cell": "exec_short",
+    "p_ambiguous": 0.1613,
+    "ask": true,
+    "correct": false
+   },
+   {
+    "id": "B5",
+    "cell": "exec_short",
+    "p_ambiguous": 0.0016,
+    "ask": false,
+    "correct": true
+   },
+   {
+    "id": "C1",
+    "cell": "amb_longpath",
+    "p_ambiguous": 0.0,
+    "ask": false,
+    "correct": false
+   },
+   {
+    "id": "C2",
+    "cell": "amb_longpath",
+    "p_ambiguous": 0.0119,
+    "ask": false,
+    "correct": false
+   },
+   {
+    "id": "C3",
+    "cell": "amb_longpath",
+    "p_ambiguous": 0.0,
+    "ask": false,
+    "correct": false
+   },
+   {
+    "id": "C4",
+    "cell": "amb_longpath",
+    "p_ambiguous": 0.0,
+    "ask": false,
+    "correct": false
+   },
+   {
+    "id": "C5",
+    "cell": "amb_longpath",
+    "p_ambiguous": 0.0001,
+    "ask": false,
+    "correct": false
+   },
+   {
+    "id": "D1",
+    "cell": "amb_short",
+    "p_ambiguous": 1.0,
+    "ask": true,
+    "correct": true
+   },
+   {
+    "id": "D2",
+    "cell": "amb_short",
+    "p_ambiguous": 1.0,
+    "ask": true,
+    "correct": true
+   },
+   {
+    "id": "D3",
+    "cell": "amb_short",
+    "p_ambiguous": 0.9999,
+    "ask": true,
+    "correct": true
+   },
+   {
+    "id": "D4",
+    "cell": "amb_short",
+    "p_ambiguous": 1.0,
+    "ask": true,
+    "correct": true
+   },
+   {
+    "id": "D5",
+    "cell": "amb_short",
+    "p_ambiguous": 0.9999,
+    "ask": true,
+    "correct": true
+   }
+  ],
+  "status": "DEVELOPMENT diagnostics - remediation evidence only"
+ },
+ "caveats": [
+  "Normalization is applied at train and inference - the deployed contract must match.",
+  "Stripping paths can remove genuinely needed context in edge cases; that cost is measured only on these splits/probes.",
+  "Val reused across trials - directional; probes are development diagnostics."
+ ],
+ "ts": 1794112342.6828012
+}

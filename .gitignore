@@ -1,3 +1,15 @@
 .venv/
 __pycache__/
 .DS_Store
+
+# Local model weights and gate state - never commit
+model.onnx
+plugin/model.onnx
+.promptimize/
+experiments/t1_probs.jsonl
+experiments/t2_embeddings.jsonl
+experiments/t2_probe_embeddings.jsonl
+experiments/t3_aug_embeddings.jsonl
+experiments/t5_embeddings.jsonl
+experiments/probe2_embeddings.jsonl
+experiments/p3_embeddings.jsonl

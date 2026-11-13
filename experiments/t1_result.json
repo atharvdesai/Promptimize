@@ -1,0 +1,20 @@
+{
+ "trial": "T1",
+ "winner": "v2_discover",
+ "train": {
+  "acc": 0.7439759036144579,
+  "over": 0.15476190476190477,
+  "under": 0.3597560975609756,
+  "n": 332,
+  "threshold": 0.3
+ },
+ "val": {
+  "acc": 0.7954545454545454,
+  "over": 0.0,
+  "under": 0.391304347826087,
+  "n": 44,
+  "threshold": 0.3
+ },
+ "instructions": "Can a coding agent complete this request by discovering anything it needs itself (reading code, running tests, grepping), without asking the user anything first?",
+ "ts": 1794097368.3566434
+}
